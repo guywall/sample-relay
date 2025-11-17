@@ -35,7 +35,7 @@ class PBSR_Settings {
             'enable_books'    => 1,
             'notify_emails'   => get_option('admin_email'),
             'enable_notify'   => 1,
-            'sample_cost'     => 0,
+			'sample_cost_override' => '',
             'allowed_sources' => 'permabound_sample_request', // NEW setting
         ];
 

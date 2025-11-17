@@ -41,7 +41,7 @@ class PBSR_Admin_Page {
         <div class="wrap">
             <h1>PERMABOUND Sample Relay</h1>
 
-            <form method="post" action="../../sample-relay-v1.0/src/options.php">
+            <form method="post" action="options.php">
                 <?php settings_fields('pbsr_group'); ?>
 
                 <table class="form-table" role="presentation">
@@ -67,6 +67,18 @@ class PBSR_Admin_Page {
                             <input type="checkbox" name="pbsr_settings[enable_books]" value="1" <?php checked(!empty($s['enable_books'])); ?> />
                             Send data to Zoho Books
                         </label></td></tr>
+					<tr>
+						<th>Sample Cost Override (£)</th>
+						<td>
+							<input type="number" 
+								   name="pbsr_settings[sample_cost_override]" 
+								   value="<?php echo esc_attr($s['sample_cost_override'] ?? ''); ?>" 
+								   step="0.01" 
+								   min="0" 
+								   style="width: 120px;">
+							<br><small>If set, this price will override the default rate for all sample line items in Zoho Books. Leave empty to use the item's default price.</small>
+						</td>
+					</tr>
                 </table>
 
                 <h3>Email Notifications</h3>
