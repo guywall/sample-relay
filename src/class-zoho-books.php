@@ -154,7 +154,7 @@ $vat_treatment = ($country === 'united kingdom' || $country === 'uk') ? 'uk' : '
 }
 
 
-   /**
+/**
  * Create a Sales Order or Estimate document.
  */
 public function createDocument(array $data, array $lines) {
@@ -186,7 +186,7 @@ public function createDocument(array $data, array $lines) {
             foreach ($doc['line_items'] as &$item) {
                 $item['rate'] = $sample_cost;
             }
-            unset($item); // Clear reference after foreach loop //test comment
+            unset($item); // Clear reference after foreach loop
             
             error_log("PBSR: Applied sample cost override of £{$sample_cost} to " . count($doc['line_items']) . " line items");
         }
