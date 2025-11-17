@@ -161,20 +161,20 @@ public function createDocument(array $data, array $lines) {
     $org        = $this->settings['org_id'];
     $contact_id = $this->findOrCreateCustomer($data);
 
-    $doc = [
-        'customer_id'      => $contact_id,
-        'reference_number' => $data['reference'] ?? '',
-        'notes'            => $data['notes'] ?? 'Sample request.',
-        'shipping_address' => [
-            'attention' => substr(trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')), 0, 50),
-            'address'   => substr($data['street'] ?? '', 0, 80),
-            'city'      => substr($data['city'] ?? '', 0, 50),
-            'state'     => substr($data['state'] ?? '', 0, 50),
-            'zip'       => substr($data['zip'] ?? '', 0, 20),
-            'country'   => substr($data['country'] ?? '', 0, 50),
-        ],
-        'line_items' => $lines,
-    ];
+    // Fetch contact to get address IDs
+$contact_info = $this->client->books_get("/contacts/{$contact_id}?organization_id={$org}");
+$billing_id = $contact_info['body']['contact']['billing_address']['address_id'] ?? null;
+$shipping_id = $contact_info['body']['contact']['shipping_address']['address_id'] ?? null;
+
+$doc = [
+    'customer_id'         => $contact_id,
+    'reference_number'    => $data['reference'] ?? '',
+    'notes'               => $data['notes'] ?? 'Sample request.',
+    'billing_address_id'  => $billing_id,
+    'shipping_address_id' => $shipping_id,
+    'line_items'          => $lines,
+];
+
 
     // Apply sample cost override if set
     $sample_cost_override = trim($this->settings['sample_cost_override'] ?? '');
