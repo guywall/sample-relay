@@ -6,7 +6,7 @@
 
  * Description: Sends sample requests from forms to Zoho Books & Zoho CRM with logs, retries, and Elementor integration.
 
- * Version: 1.02
+ * Version: 1.03
 
  * Author: You
 

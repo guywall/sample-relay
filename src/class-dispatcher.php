@@ -138,15 +138,64 @@ class PBSR_Dispatcher {
 if (!empty($settings['enable_notify']) && !empty($settings['notify_emails'])) {
     $recipients = array_map('trim', explode(',', $settings['notify_emails']));
 
+    // Address (same pattern as pb_submit_samples)
+    $street   = $raw['street']    ?? '';
+    $addr2    = $raw['address_2'] ?? '';
+    $city     = $raw['city']      ?? '';
+    $county   = $raw['county']    ?? '';
+    $country  = $raw['country']   ?? '';
+    $postcode = $raw['postcode']  ?? ($data['zip'] ?? '');
+
+    $full_address = trim(
+        $street
+        . ($addr2 ? ', ' . $addr2 : '')
+        . ($city   ? ', ' . $city   : '')
+        . ($county ? ', ' . $county : '')
+        . ($country ? ', ' . $country : '')
+        . ($postcode ? ' ' . $postcode : '')
+    );
+
+    // Context: page, referrer, UTM
+    $context   = $raw['context'] ?? [];
+    $page_url  = $context['page_url']  ?? '';
+    $referrer  = $context['referrer']  ?? '';
+    $utm       = $context['utm']       ?? [];
+    $utm_src   = $utm['utm_source']   ?? '';
+    $utm_med   = $utm['utm_medium']   ?? '';
+    $utm_camp  = $utm['utm_campaign'] ?? '';
+
     $subject = 'New PERMABOUND Sample Request';
     $message  = "A new sample request has been received.\n\n";
-    $message .= "Name: " . ($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '') . "\n";
-    $message .= "Company: " . ($data['company'] ?? '') . "\n";
+
+    $message .= "Name: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
+    $message .= "Company: " . ($data['company'] ?? $data['organisation_name'] ?? '') . "\n";
     $message .= "Email: " . ($data['email'] ?? '') . "\n";
     $message .= "Phone: " . ($data['phone'] ?? '') . "\n";
-    $message .= "Postcode: " . ($data['zip'] ?? '') . "\n";
-    $message .= "Blends: " . implode(', ', $data['blends'] ?? []) . "\n\n";
-    $message .= "CRM Status: {$crm_status}\nBooks Status: {$books_status}\n\n";
+
+    if ($full_address !== '') {
+        $message .= "Address: {$full_address}\n";
+    }
+
+    $message .= "Blends: " . implode(', ', $data['blends'] ?? []) . "\n";
+
+    // Same style as your original snippet
+    if ($page_url) {
+        $message .= "Page: {$page_url}\n";
+    }
+    if ($referrer) {
+        $message .= "Referrer: {$referrer}\n";
+    }
+
+    // Simple UTM line if present
+    if ($utm_src || $utm_med || $utm_camp) {
+        $parts = [];
+        if ($utm_src)  $parts[] = "source={$utm_src}";
+        if ($utm_med)  $parts[] = "medium={$utm_med}";
+        if ($utm_camp) $parts[] = "campaign={$utm_camp}";
+        $message .= "UTM: " . implode(', ', $parts) . "\n";
+    }
+
+    $message .= "\nCRM Status: {$crm_status}\nBooks Status: {$books_status}\n\n";
     $message .= "This message was generated automatically by the Sample Relay plugin.";
 
     $headers = ['Content-Type: text/plain; charset=UTF-8'];
@@ -157,7 +206,6 @@ if (!empty($settings['enable_notify']) && !empty($settings['notify_emails'])) {
         }
     }
 }
-
 
             PBSR_Logger::write($source, $key, $data, $crm_status, $crm_resp, $books_status, $books_resp, 0);
 
