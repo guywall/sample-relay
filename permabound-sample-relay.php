@@ -49,6 +49,7 @@ require_once PBSR_PATH . 'src/class-admin-page.php';
 require_once PBSR_PATH . 'src/class-rest-endpoint.php';
 
 require_once PBSR_PATH . 'src/integrations/elementor.php';
+require_once PBSR_PATH . 'src/integrations/product-selection-form.php';
 
 
 
