@@ -24,6 +24,41 @@ class PBSR_Mapper {
     }
 
     /**
+     * Parse admin-managed hidden sample values (SKU or name).
+     */
+    public static function parseHiddenSamples( $hidden_raw ) {
+        if ( ! is_string( $hidden_raw ) || trim( $hidden_raw ) === '' ) {
+            return [];
+        }
+
+        $parts = preg_split( '/[\r\n,;]+/', strtolower( $hidden_raw ) );
+        return array_values( array_unique( array_filter( array_map( 'trim', $parts ) ) ) );
+    }
+
+    /**
+     * Remove samples that are hidden/unavailable.
+     */
+    public static function filterAvailableSamples( array $samples, array $hidden_samples ) {
+        if ( empty( $hidden_samples ) ) {
+            return $samples;
+        }
+
+        $filtered = [];
+        foreach ( $samples as $sample ) {
+            $name = strtolower( trim( $sample['name'] ?? '' ) );
+            $sku  = strtolower( trim( $sample['sku'] ?? '' ) );
+
+            if ( in_array( $sku, $hidden_samples, true ) || in_array( $name, $hidden_samples, true ) ) {
+                continue;
+            }
+
+            $filtered[] = $sample;
+        }
+
+        return $filtered;
+    }
+
+    /**
      * Build Zoho Books line items from blend names by looking up matching Products CPTs.
      *
      * Each blend name must match a Product post title; its ACF field `sample_sku`

@@ -60,11 +60,18 @@ class PBSR_Dispatcher {
 
         $data['blends'] = $blends;
 
-
+        $hidden_samples = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
+        if (!empty($hidden_samples) && !empty($raw['samples']) && is_array($raw['samples'])) {
+            $raw['samples'] = PBSR_Mapper::filterAvailableSamples($raw['samples'], $hidden_samples);
+            $data['blends'] = array_values(array_map(function($sample) {
+                return trim($sample['name'] ?? '');
+            }, $raw['samples']));
+            $data['blends'] = array_values(array_filter($data['blends']));
+        }
 
         // Idempotency key
 
-        $key = $idempotency_key ?: md5(wp_json_encode([$source, $data['email'] ?? '', $blends, $data['reference'] ?? '', $data['street'] ?? '', time() - (time()%3600)]));
+        $key = $idempotency_key ?: md5(wp_json_encode([$source, $data['email'] ?? '', $data['blends'] ?? [], $data['reference'] ?? '', $data['street'] ?? '', time() - (time()%3600)]));
 
 
 
