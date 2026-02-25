@@ -297,7 +297,7 @@ class PBSR_Product_Selection_Form {
         $hidden = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
 
         $products = get_posts([
-            'post_type' => 'product',
+            'post_type' => ['product', 'products'],
             'post_status' => 'publish',
             'posts_per_page' => -1,
             'orderby' => 'title',
@@ -312,13 +312,11 @@ class PBSR_Product_Selection_Form {
             if ($sku === '') {
                 $sku = (string) get_post_meta($product_id, 'sku', true);
             }
+            if ($sku === '') {
+                $sku = (string) get_post_meta($product_id, '_sku', true);
+            }
 
-            $name_check = strtolower(trim($name));
-            $sku_check = strtolower(trim($sku));
-            if (
-                (!empty($name_check) && in_array($name_check, $hidden, true)) ||
-                (!empty($sku_check) && in_array($sku_check, $hidden, true))
-            ) {
+            if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
                 continue;
             }
 

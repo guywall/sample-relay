@@ -36,6 +36,42 @@ class PBSR_Mapper {
     }
 
     /**
+     * Determine if a sample should be hidden by name or SKU.
+     */
+    public static function isSampleHidden( $name, $sku, array $hidden_samples ) {
+        if ( empty( $hidden_samples ) ) {
+            return false;
+        }
+
+        $name_raw = strtolower( trim( (string) $name ) );
+        $sku_raw  = strtolower( trim( (string) $sku ) );
+
+        if ( in_array( $name_raw, $hidden_samples, true ) || in_array( $sku_raw, $hidden_samples, true ) ) {
+            return true;
+        }
+
+        $name_norm = preg_replace( '/[^a-z0-9]/', '', $name_raw );
+        $sku_norm  = preg_replace( '/[^a-z0-9]/', '', $sku_raw );
+
+        foreach ( $hidden_samples as $hidden ) {
+            $hidden_norm = preg_replace( '/[^a-z0-9]/', '', (string) $hidden );
+            if ( $hidden_norm === '' ) {
+                continue;
+            }
+
+            if ( $name_norm !== '' && $name_norm === $hidden_norm ) {
+                return true;
+            }
+
+            if ( $sku_norm !== '' && $sku_norm === $hidden_norm ) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
      * Remove samples that are hidden/unavailable.
      */
     public static function filterAvailableSamples( array $samples, array $hidden_samples ) {
@@ -45,10 +81,10 @@ class PBSR_Mapper {
 
         $filtered = [];
         foreach ( $samples as $sample ) {
-            $name = strtolower( trim( $sample['name'] ?? '' ) );
-            $sku  = strtolower( trim( $sample['sku'] ?? '' ) );
+            $name = $sample['name'] ?? '';
+            $sku  = $sample['sku'] ?? '';
 
-            if ( in_array( $sku, $hidden_samples, true ) || in_array( $name, $hidden_samples, true ) ) {
+            if ( self::isSampleHidden( $name, $sku, $hidden_samples ) ) {
                 continue;
             }
 
