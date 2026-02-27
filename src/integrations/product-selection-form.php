@@ -308,15 +308,9 @@ class PBSR_Product_Selection_Form {
         $out = [];
         foreach ($products as $product_id) {
             $name = get_the_title($product_id);
-            $sku = (string) get_post_meta($product_id, 'sample_sku', true);
-            if ($sku === '') {
-                $sku = (string) get_post_meta($product_id, 'sku', true);
-            }
-            if ($sku === '') {
-                $sku = (string) get_post_meta($product_id, '_sku', true);
-            }
+            $sku = self::get_product_sku($product_id);
 
-            if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
+            if (self::is_product_hidden($product_id, $name, $sku, $hidden)) {
                 continue;
             }
 
@@ -329,6 +323,82 @@ class PBSR_Product_Selection_Form {
         }
 
         return $out;
+    }
+
+
+    private static function is_product_hidden($product_id, $name, $sku, array $hidden) {
+        if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
+            return true;
+        }
+
+        foreach (self::get_sku_candidates($product_id) as $candidate) {
+            if (PBSR_Mapper::isSampleHidden('', $candidate, $hidden)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static function get_product_sku($product_id) {
+        $preferred_keys = ['sample_sku', 'sku', '_sku', 'product_sku'];
+
+        foreach ($preferred_keys as $key) {
+            $value = trim((string) get_post_meta($product_id, $key, true));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        if (function_exists('get_field')) {
+            foreach ($preferred_keys as $key) {
+                $value = trim((string) get_field($key, $product_id));
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        $candidates = self::get_sku_candidates($product_id);
+        return !empty($candidates) ? $candidates[0] : '';
+    }
+
+    private static function get_sku_candidates($product_id) {
+        $candidates = [];
+        $all_meta = get_post_meta($product_id);
+        if (is_array($all_meta)) {
+            foreach ($all_meta as $key => $values) {
+                if (stripos((string) $key, 'sku') === false) {
+                    continue;
+                }
+                foreach ((array) $values as $value) {
+                    if (!is_scalar($value)) {
+                        continue;
+                    }
+                    $value = trim((string) $value);
+                    if ($value !== '') {
+                        $candidates[] = $value;
+                    }
+                }
+            }
+        }
+
+        if (function_exists('get_fields')) {
+            $acf_fields = get_fields($product_id);
+            if (is_array($acf_fields)) {
+                foreach ($acf_fields as $key => $value) {
+                    if (stripos((string) $key, 'sku') === false || !is_scalar($value)) {
+                        continue;
+                    }
+                    $value = trim((string) $value);
+                    if ($value !== '') {
+                        $candidates[] = $value;
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($candidates));
     }
 
     private static function build_samples_from_ids(array $product_ids) {
