@@ -3,10 +3,18 @@ if (!defined('ABSPATH')) exit;
 
 class PBSR_Product_Selection_Form {
 
+    const AJAX_ACTION = 'pbsr_handle_product_selection_form_submission';
+
     public static function init() {
+        add_action('init', [__CLASS__, 'register_hooks'], 999);
+    }
+
+    public static function register_hooks() {
+        remove_shortcode('product_selection_form');
         add_shortcode('product_selection_form', [__CLASS__, 'render_shortcode']);
-        add_action('wp_ajax_handle_product_selection_form_submission', [__CLASS__, 'handle_submission']);
-        add_action('wp_ajax_nopriv_handle_product_selection_form_submission', [__CLASS__, 'handle_submission']);
+
+        add_action('wp_ajax_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
+        add_action('wp_ajax_nopriv_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
     }
 
     public static function render_shortcode() {
@@ -17,7 +25,7 @@ class PBSR_Product_Selection_Form {
         ?>
         <form id="pbsr-product-selection-form" class="pbsr-form" method="post" action="">
             <input type="hidden" name="product_selection_form_nonce" value="<?php echo esc_attr($nonce); ?>">
-            <input type="hidden" name="action" value="handle_product_selection_form_submission">
+            <input type="hidden" name="action" value="<?php echo esc_attr(self::AJAX_ACTION); ?>">
 
             <div id="pbsr-step-1" class="pbsr-step">
                 <h3>Personal Details</h3>
