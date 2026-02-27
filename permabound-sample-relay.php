@@ -6,7 +6,7 @@
 
  * Description: Sends sample requests from forms to Zoho Books & Zoho CRM with logs, retries, and Elementor integration.
 
- * Version: 1.03
+ * Version: 1.52b
 
  * Author: You
 
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) exit;
 
 
 
-define('PBSR_VER', '0.1.0');
+define('PBSR_VER', '1.52b');
 
 define('PBSR_SLUG', 'permabound-sample-relay');
 
@@ -45,10 +45,12 @@ require_once PBSR_PATH . 'src/class-mapper.php';
 require_once PBSR_PATH . 'src/class-dispatcher.php';
 
 require_once PBSR_PATH . 'src/class-admin-page.php';
+require_once PBSR_PATH . 'src/class-product-availability.php';
 
 require_once PBSR_PATH . 'src/class-rest-endpoint.php';
 
 require_once PBSR_PATH . 'src/integrations/elementor.php';
+require_once PBSR_PATH . 'src/integrations/product-selection-form.php';
 
 
 

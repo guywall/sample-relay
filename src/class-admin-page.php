@@ -101,6 +101,14 @@ class PBSR_Admin_Page {
                     <br><small>Only forms with these “source” values will be processed. Others will be ignored silently.</small>
                 </p>
 
+                <h3>Sample Availability</h3>
+                <p>
+                    <label>Hidden / unavailable samples (SKU or name, one per line)</label><br>
+                    <textarea name="pbsr_settings[hidden_samples]" rows="6" style="width: 400px;"><?php echo esc_textarea($s['hidden_samples'] ?? ''); ?></textarea>
+                    <br><small>Use this to temporarily hide samples that are out of stock. Matching is case-insensitive and checks both SKU and sample name.</small>
+                    <br><small>You can also mark individual products as unavailable directly on the product edit screen using the "Sample Availability" checkbox.</small>
+                </p>
+
                 <p class="submit"><button class="button button-primary">Save Settings</button></p>
             </form>
         </div>
