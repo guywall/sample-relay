@@ -6,7 +6,7 @@
 
  * Description: Sends sample requests from forms to Zoho Books & Zoho CRM with logs, retries, and Elementor integration.
 
- * Version: 1.52b
+ * Version: 1.6
 
  * Author: You
 
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) exit;
 
 
 
-define('PBSR_VER', '1.52b');
+define('PBSR_VER', '1.6');
 
 define('PBSR_SLUG', 'permabound-sample-relay');
 
