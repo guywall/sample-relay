@@ -307,6 +307,10 @@ class PBSR_Product_Selection_Form {
 
         $out = [];
         foreach ($products as $product_id) {
+            if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
+                continue;
+            }
+
             $name = get_the_title($product_id);
             $sku = self::get_product_sku($product_id);
 

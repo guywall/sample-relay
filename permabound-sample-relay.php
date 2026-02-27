@@ -45,6 +45,7 @@ require_once PBSR_PATH . 'src/class-mapper.php';
 require_once PBSR_PATH . 'src/class-dispatcher.php';
 
 require_once PBSR_PATH . 'src/class-admin-page.php';
+require_once PBSR_PATH . 'src/class-product-availability.php';
 
 require_once PBSR_PATH . 'src/class-rest-endpoint.php';
 

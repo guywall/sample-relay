@@ -59,7 +59,7 @@ class PBSR_Mapper {
                 continue;
             }
 
-            if ( $name_norm !== '' && $name_norm === $hidden_norm ) {
+            if ( $name_norm !== '' && ($name_norm === $hidden_norm || strpos( $name_norm, $hidden_norm ) !== false) ) {
                 return true;
             }
 
