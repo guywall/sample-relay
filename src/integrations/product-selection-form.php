@@ -3,7 +3,7 @@ if (!defined('ABSPATH')) exit;
 
 class PBSR_Product_Selection_Form {
 
-    const AJAX_ACTION = 'pbsr_handle_product_selection_form_submission';
+    const AJAX_ACTION = 'pb_submit_samples';
 
     public static function init() {
         add_action('init', [__CLASS__, 'register_hooks'], 999);
@@ -11,332 +11,362 @@ class PBSR_Product_Selection_Form {
 
     public static function register_hooks() {
         remove_shortcode('product_selection_form');
+        remove_shortcode('permabound_sample_request');
+
         add_shortcode('product_selection_form', [__CLASS__, 'render_shortcode']);
+        add_shortcode('permabound_sample_request', [__CLASS__, 'render_shortcode']);
 
         add_action('wp_ajax_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
         add_action('wp_ajax_nopriv_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
     }
 
-    public static function render_shortcode() {
-        $products = self::get_available_products();
-        $nonce = wp_create_nonce('product_selection_form_nonce');
+    public static function render_shortcode($atts = []) {
+        $atts = shortcode_atts([
+            'categories' => 'resin-bound-stone-blends,rubber-mulch,soft-gravel,colourbound',
+            'max' => 4,
+        ], $atts);
+
+        $nonce = wp_create_nonce('pbsamples_nonce');
+        $cats = array_values(array_filter(array_map('trim', explode(',', (string) $atts['categories']))));
+        $max = max(1, (int) $atts['max']);
+        $max = min($max, 8);
+
+        $products = self::get_available_products($cats);
 
         ob_start();
         ?>
-        <form id="pbsr-product-selection-form" class="pbsr-form" method="post" action="">
-            <input type="hidden" name="product_selection_form_nonce" value="<?php echo esc_attr($nonce); ?>">
+        <form id="pb-samples-form" class="pb-form" novalidate>
             <input type="hidden" name="action" value="<?php echo esc_attr(self::AJAX_ACTION); ?>">
+            <input type="hidden" name="pbsamples_nonce" value="<?php echo esc_attr($nonce); ?>">
+            <input type="hidden" id="pb-max" value="<?php echo esc_attr($max); ?>">
+            <input type="hidden" name="max" value="<?php echo esc_attr($max); ?>">
+            <input type="text" name="website" class="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;">
 
-            <div id="pbsr-step-1" class="pbsr-step">
-                <h3>Personal Details</h3>
+            <section class="pb-step" data-step="1">
+                <h3>Select up to <?php echo esc_html($max); ?> samples</h3>
+                <p><input type="search" id="pb-search" placeholder="Search products..."></p>
 
-                <p><label for="pbsr-first-name">First Name</label><br>
-                <input id="pbsr-first-name" type="text" name="first_name" required></p>
+                <div id="pb-products-wrap">
+                    <?php foreach ($products as $category_label => $items) : ?>
+                        <details class="pb-accordion" open>
+                            <summary><?php echo esc_html($category_label); ?></summary>
+                            <div class="pb-products">
+                                <?php foreach ($items as $product) : ?>
+                                    <label class="pb-card" data-name="<?php echo esc_attr(strtolower($product['name'])); ?>">
+                                        <input type="checkbox" class="pb-choice" name="product_selection[]" value="<?php echo esc_attr($product['name']); ?>" data-name="<?php echo esc_attr($product['name']); ?>" data-sku="<?php echo esc_attr($product['sku']); ?>">
+                                        <?php if (!empty($product['thumbnail'])) : ?>
+                                            <img src="<?php echo esc_url($product['thumbnail']); ?>" alt="<?php echo esc_attr($product['name']); ?>">
+                                        <?php endif; ?>
+                                        <span class="pb-name"><?php echo esc_html($product['name']); ?></span>
+                                    </label>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
+                    <?php endforeach; ?>
+                </div>
 
-                <p><label for="pbsr-surname">Surname</label><br>
-                <input id="pbsr-surname" type="text" name="surname" required></p>
+                <p id="pb-count-wrap"><strong><span id="pb-count">0</span>/<?php echo esc_html($max); ?></strong> selected</p>
+                <p><button type="button" class="button button-primary" data-next>Next</button></p>
+            </section>
 
-                <p><label for="pbsr-email">Email</label><br>
-                <input id="pbsr-email" type="email" name="email" required></p>
+            <section class="pb-step" data-step="2" hidden>
+                <h3>Your details</h3>
+                <p><input name="first_name" placeholder="First name" required></p>
+                <p><input name="surname" placeholder="Surname" required></p>
+                <p><input name="email" type="email" placeholder="Email" required></p>
+                <p><input name="phone" placeholder="Phone" required></p>
+                <p><input name="organisation_name" placeholder="Organisation name"></p>
+                <p><input name="street" placeholder="Street" required></p>
+                <p><input name="address_2" placeholder="Address 2"></p>
+                <p><input name="city" placeholder="Town / City" required></p>
+                <p><input name="county" placeholder="County" required></p>
+                <p><input name="country" placeholder="Country" value="United Kingdom" required></p>
+                <p><input name="postcode" placeholder="Postcode" required></p>
+                <p>
+                    <select name="enquiry_type" required>
+                        <option value="">Please select enquiry type</option>
+                        <option value="homeowner">Homeowner</option>
+                        <option value="contractor_installer">Contractor/Installer</option>
+                        <option value="merchant_reseller">Merchant/Reseller</option>
+                        <option value="local_authority">Local Authority</option>
+                        <option value="other">Other</option>
+                    </select>
+                </p>
+                <p><label><input type="checkbox" name="gdpr_consent" value="1" required> I agree to be contacted.</label></p>
+                <p>
+                    <button type="button" class="button" data-prev>Previous</button>
+                    <button type="button" class="button button-primary" data-next>Next</button>
+                </p>
+            </section>
 
-                <p><label for="pbsr-phone">Phone</label><br>
-                <input id="pbsr-phone" type="text" name="phone" pattern="[0-9+ ]*" required></p>
-
-                <p><label for="pbsr-enquiry-type">Enquiry Type</label><br>
-                <select id="pbsr-enquiry-type" name="enquiry_type" required>
-                    <option value="">-- Please select --</option>
-                    <option value="homeowner">Homeowner</option>
-                    <option value="contractor_installer">Contractor/Installer</option>
-                    <option value="merchant_reseller">Merchant/Reseller</option>
-                    <option value="local_authority">Local Authority</option>
-                    <option value="other">Other</option>
-                </select></p>
-
-                <p id="pbsr-org-wrap" style="display:none;"><label for="pbsr-organisation-name">Organisation Name</label><br>
-                <input id="pbsr-organisation-name" type="text" name="organisation_name"></p>
-
-                <p><label for="pbsr-street">Street</label><br>
-                <input id="pbsr-street" type="text" name="street" required></p>
-
-                <p><label for="pbsr-address-2">Address 2</label><br>
-                <input id="pbsr-address-2" type="text" name="address_2"></p>
-
-                <p><label for="pbsr-city">Town / City</label><br>
-                <input id="pbsr-city" type="text" name="city" required></p>
-
-                <p><label for="pbsr-county">County</label><br>
-                <input id="pbsr-county" type="text" name="county" required></p>
-
-                <p><label for="pbsr-country">Country</label><br>
-                <input id="pbsr-country" type="text" name="country" required></p>
-
-                <p><label for="pbsr-postcode">Postcode</label><br>
-                <input id="pbsr-postcode" type="text" name="postcode" required></p>
-
-                <button type="button" class="pbsr-next" data-next="2">Next</button>
-            </div>
-
-            <div id="pbsr-step-2" class="pbsr-step" style="display:none;">
-                <h3>Select up to 3 sample products</h3>
-                <?php if (empty($products)) : ?>
-                    <p>No sample products are currently available.</p>
-                <?php else : ?>
-                    <div class="pbsr-products-grid">
-                        <?php foreach ($products as $product) : ?>
-                            <label class="pbsr-product-option">
-                                <input
-                                    type="checkbox"
-                                    name="product_selection[]"
-                                    value="<?php echo esc_attr($product['id']); ?>"
-                                    data-name="<?php echo esc_attr($product['name']); ?>"
-                                >
-                                <?php if ($product['thumbnail']) : ?>
-                                    <img src="<?php echo esc_url($product['thumbnail']); ?>" alt="<?php echo esc_attr($product['name']); ?>">
-                                <?php endif; ?>
-                                <span><?php echo esc_html($product['name']); ?></span>
-                            </label>
-                        <?php endforeach; ?>
-                    </div>
-                <?php endif; ?>
-
-                <button type="button" class="pbsr-prev" data-prev="1">Previous</button>
-                <button type="button" class="pbsr-next" data-next="3">Next</button>
-            </div>
-
-            <div id="pbsr-step-3" class="pbsr-step" style="display:none;">
-                <h3>Review &amp; Submit</h3>
-                <div id="pbsr-review"></div>
-                <div id="pbsr-submission-status" style="margin:10px 0;"></div>
-                <button type="button" class="pbsr-prev" data-prev="2">Previous</button>
-                <button type="button" id="pbsr-submit-btn">Submit</button>
-            </div>
+            <section class="pb-step" data-step="3" hidden>
+                <h3>Review and submit</h3>
+                <div id="pb-review"></div>
+                <div id="pb-status"></div>
+                <p>
+                    <button type="button" class="button" data-prev>Previous</button>
+                    <button type="button" class="button button-primary" id="pb-submit">Submit</button>
+                </p>
+            </section>
         </form>
 
         <style>
-            .pbsr-products-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:16px; margin-bottom:16px; }
-            .pbsr-product-option { border:1px solid #ddd; padding:10px; text-align:center; }
-            .pbsr-product-option img { max-width:100%; height:auto; display:block; margin:0 auto 10px; }
+            #pb-samples-form .pb-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+            #pb-samples-form .pb-card{display:flex;flex-direction:column;gap:8px;border:1px solid #ddd;padding:8px;border-radius:8px}
+            #pb-samples-form .pb-card img{max-width:100%;height:auto}
+            #pb-samples-form .pb-step[hidden]{display:none!important}
+            #pb-samples-form .is-selected{outline:2px solid #ff9f23}
+            #pb-samples-form .hp{display:none!important}
         </style>
 
         <script>
-            (function() {
-                const form = document.getElementById('pbsr-product-selection-form');
-                if (!form) return;
+            (function(){
+                const form = document.getElementById('pb-samples-form');
+                if (!form || form.dataset.pbInit) return;
+                form.dataset.pbInit = '1';
 
-                const steps = [1,2,3];
-                const showStep = function(step) {
-                    steps.forEach(function(i) {
-                        const el = document.getElementById('pbsr-step-' + i);
-                        if (el) el.style.display = i === step ? 'block' : 'none';
+                const steps = Array.from(form.querySelectorAll('.pb-step'));
+                const max = parseInt((form.querySelector('#pb-max')||{}).value || '4', 10);
+
+                function stepIndex(){ return steps.findIndex(s => !s.hasAttribute('hidden')); }
+                function showStep(idx){ steps.forEach((s,i)=> i===idx ? s.removeAttribute('hidden') : s.setAttribute('hidden','hidden')); if (idx===2) buildReview(); }
+                function picks(){ return Array.from(form.querySelectorAll('.pb-choice:checked')); }
+                function updateCount(){
+                    const c = picks().length;
+                    const count = form.querySelector('#pb-count');
+                    if (count) count.textContent = String(c);
+                    form.querySelectorAll('.pb-card').forEach(card => {
+                        const cb = card.querySelector('.pb-choice');
+                        card.classList.toggle('is-selected', !!(cb && cb.checked));
                     });
+                }
 
-                    if (step === 3) {
-                        renderReview();
-                    }
-                };
-
-                const selectedProducts = function() {
-                    return Array.from(form.querySelectorAll('input[name="product_selection[]"]:checked'));
-                };
-
-                const validateStep1 = function() {
-                    const required = ['first_name','surname','email','phone','street','city','county','country','postcode','enquiry_type'];
-                    for (const field of required) {
-                        const el = form.querySelector('[name="' + field + '"]');
-                        if (!el || !el.value.trim()) {
-                            alert('Please complete all required fields before continuing.');
-                            return false;
-                        }
-                    }
-                    return true;
-                };
-
-                const renderReview = function() {
-                    const review = document.getElementById('pbsr-review');
+                function buildReview(){
+                    const names = picks().map(x => x.dataset.name || x.value).join(', ');
+                    const review = form.querySelector('#pb-review');
                     if (!review) return;
+                    review.innerHTML = '<p><strong>Name:</strong> ' + (form.first_name.value||'') + ' ' + (form.surname.value||'') + '</p>' +
+                        '<p><strong>Email:</strong> ' + (form.email.value||'') + '</p>' +
+                        '<p><strong>Selected products:</strong> ' + names + '</p>';
+                }
 
-                    const products = selectedProducts().map(function(el){ return el.dataset.name || ''; }).filter(Boolean);
-                    review.innerHTML = '' +
-                        '<p><strong>Name:</strong> ' + form.first_name.value + ' ' + form.surname.value + '</p>' +
-                        '<p><strong>Email:</strong> ' + form.email.value + '</p>' +
-                        '<p><strong>Phone:</strong> ' + form.phone.value + '</p>' +
-                        '<p><strong>Address:</strong> ' + form.street.value + ', ' + form.city.value + ', ' + form.county.value + ', ' + form.country.value + ' ' + form.postcode.value + '</p>' +
-                        '<p><strong>Selected Products:</strong> ' + (products.join(', ') || 'None') + '</p>';
-                };
-
-                form.addEventListener('change', function(e) {
-                    if (e.target && e.target.name === 'enquiry_type') {
-                        const orgWrap = document.getElementById('pbsr-org-wrap');
-                        if (orgWrap) {
-                            orgWrap.style.display = (e.target.value && e.target.value !== 'homeowner') ? 'block' : 'none';
-                        }
-                    }
-
-                    if (e.target && e.target.name === 'product_selection[]') {
-                        const picks = selectedProducts();
-                        if (picks.length > 3) {
+                form.addEventListener('change', function(e){
+                    if (e.target.classList.contains('pb-choice')) {
+                        if (picks().length > max) {
                             e.target.checked = false;
-                            alert('You can select a maximum of three products.');
+                            alert('You can select a maximum of ' + max + ' samples.');
                         }
+                        updateCount();
                     }
                 });
 
-                form.querySelectorAll('.pbsr-next').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        const next = parseInt(btn.dataset.next, 10);
-                        if (next === 2 && !validateStep1()) return;
-                        showStep(next);
-                    });
-                });
-
-                form.querySelectorAll('.pbsr-prev').forEach(function(btn) {
-                    btn.addEventListener('click', function() {
-                        showStep(parseInt(btn.dataset.prev, 10));
-                    });
-                });
-
-                const submitBtn = document.getElementById('pbsr-submit-btn');
-                if (submitBtn) {
-                    submitBtn.addEventListener('click', function() {
-                        const status = document.getElementById('pbsr-submission-status');
-                        if (status) status.textContent = 'Submitting...';
-
-                        const formData = new FormData(form);
-                        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
-                            method: 'POST',
-                            body: formData,
-                            headers: { 'X-Requested-With': 'XMLHttpRequest' }
-                        })
-                        .then(function(r) { return r.json(); })
-                        .then(function(data) {
-                            if (data && data.success) {
-                                if (status) status.textContent = 'Submission successful. Thank you.';
-                                submitBtn.disabled = true;
-                            } else {
-                                const msg = (data && data.data && data.data.message) ? data.data.message : 'Submission failed. Please try again.';
-                                if (status) status.textContent = msg;
-                            }
-                        })
-                        .catch(function() {
-                            if (status) status.textContent = 'Submission failed. Please try again.';
+                const search = form.querySelector('#pb-search');
+                if (search) {
+                    search.addEventListener('input', function(){
+                        const q = (search.value||'').toLowerCase().trim();
+                        form.querySelectorAll('.pb-card').forEach(card => {
+                            const name = card.getAttribute('data-name') || '';
+                            card.style.display = !q || name.indexOf(q) !== -1 ? '' : 'none';
                         });
                     });
                 }
+
+                form.addEventListener('click', function(e){
+                    const next = e.target.closest('[data-next]');
+                    if (next) {
+                        const idx = stepIndex();
+                        if (idx === 0 && picks().length === 0) {
+                            alert('Please select at least one sample.');
+                            return;
+                        }
+                        if (idx === 1 && !form.checkValidity()) {
+                            form.reportValidity();
+                            return;
+                        }
+                        showStep(Math.min(idx + 1, 2));
+                        return;
+                    }
+
+                    const prev = e.target.closest('[data-prev]');
+                    if (prev) {
+                        showStep(Math.max(stepIndex() - 1, 0));
+                        return;
+                    }
+
+                    const submit = e.target.closest('#pb-submit');
+                    if (submit) {
+                        submit.disabled = true;
+                        const status = form.querySelector('#pb-status');
+                        if (status) status.textContent = 'Submitting...';
+
+                        const fd = new FormData(form);
+                        picks().forEach(c => {
+                            fd.append('product_names[]', c.getAttribute('data-name') || c.value);
+                            fd.append('product_skus[]', c.getAttribute('data-sku') || '');
+                        });
+
+                        fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>', {
+                            method: 'POST',
+                            body: fd,
+                            headers: {'X-Requested-With':'XMLHttpRequest'}
+                        }).then(r => r.json()).then(data => {
+                            if (data && data.success) {
+                                if (status) status.innerHTML = '<p class="ok">Submission successful.</p>';
+                            } else {
+                                const msg = (data && data.data && data.data.message) ? data.data.message : 'Submission failed.';
+                                if (status) status.innerHTML = '<p class="err">' + msg + '</p>';
+                                submit.disabled = false;
+                            }
+                        }).catch(() => {
+                            if (status) status.innerHTML = '<p class="err">Submission failed.</p>';
+                            submit.disabled = false;
+                        });
+                    }
+                });
+
+                updateCount();
+                showStep(0);
             })();
         </script>
         <?php
-
         return ob_get_clean();
     }
 
     public static function handle_submission() {
-        if (!isset($_POST['product_selection_form_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['product_selection_form_nonce'])), 'product_selection_form_nonce')) {
-            wp_send_json_error(['message' => 'Nonce verification failed.']);
+        if (!empty($_POST['website'])) {
+            wp_send_json_error(['message' => 'Spam blocked.']);
         }
 
-        $first_name = sanitize_text_field(wp_unslash($_POST['first_name'] ?? ''));
-        $surname = sanitize_text_field(wp_unslash($_POST['surname'] ?? ''));
+        if (!isset($_POST['pbsamples_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['pbsamples_nonce'])), 'pbsamples_nonce')) {
+            wp_send_json_error(['message' => 'Invalid nonce.']);
+        }
+
+        $first = sanitize_text_field(wp_unslash($_POST['first_name'] ?? ''));
+        $last = sanitize_text_field(wp_unslash($_POST['surname'] ?? ''));
         $email = sanitize_email(wp_unslash($_POST['email'] ?? ''));
         $phone = sanitize_text_field(wp_unslash($_POST['phone'] ?? ''));
-        $enquiry_type = sanitize_text_field(wp_unslash($_POST['enquiry_type'] ?? ''));
-        $organisation_name = sanitize_text_field(wp_unslash($_POST['organisation_name'] ?? ''));
+        $enquiry = sanitize_text_field(wp_unslash($_POST['enquiry_type'] ?? ''));
+        $org = sanitize_text_field(wp_unslash($_POST['organisation_name'] ?? ''));
         $street = sanitize_text_field(wp_unslash($_POST['street'] ?? ''));
-        $address_2 = sanitize_text_field(wp_unslash($_POST['address_2'] ?? ''));
+        $addr2 = sanitize_text_field(wp_unslash($_POST['address_2'] ?? ''));
         $city = sanitize_text_field(wp_unslash($_POST['city'] ?? ''));
         $county = sanitize_text_field(wp_unslash($_POST['county'] ?? ''));
         $country = sanitize_text_field(wp_unslash($_POST['country'] ?? ''));
         $postcode = sanitize_text_field(wp_unslash($_POST['postcode'] ?? ''));
 
-        $selected_ids = isset($_POST['product_selection']) ? array_map('absint', (array) wp_unslash($_POST['product_selection'])) : [];
-        $selected_ids = array_values(array_filter(array_unique($selected_ids)));
+        $gdpr = !empty($_POST['gdpr_consent']);
 
-        if (count($selected_ids) > 3) {
-            wp_send_json_error(['message' => 'You can select a maximum of three products.']);
+        $product_names = isset($_POST['product_names']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['product_names'])) : [];
+        $product_skus = isset($_POST['product_skus']) ? array_map('sanitize_text_field', (array) wp_unslash($_POST['product_skus'])) : [];
+
+        $max = isset($_POST['max']) ? (int) $_POST['max'] : 4;
+        if ($max < 1) {
+            $max = 4;
         }
 
-        $samples = self::build_samples_from_ids($selected_ids);
-        if (empty($samples)) {
-            wp_send_json_error(['message' => 'Please select at least one available product.']);
+        $samples = [];
+        foreach ($product_names as $i => $name) {
+            $name = trim($name);
+            if ($name === '') {
+                continue;
+            }
+            $samples[] = [
+                'name' => $name,
+                'sku' => trim((string) ($product_skus[$i] ?? '')),
+            ];
+        }
+        $samples = array_slice($samples, 0, $max);
+
+        if (!$first || !$last || !$email || !$phone || !$street || !$city || !$county || !$country || !$postcode || !$enquiry || !$gdpr || empty($samples)) {
+            wp_send_json_error(['message' => 'Missing required fields.']);
         }
 
         $raw = [
             'source' => 'permabound_sample_request',
-            'first_name' => $first_name,
-            'last_name' => $surname,
-            'name' => trim($first_name . ' ' . $surname),
+            'first_name' => $first,
+            'last_name' => $last,
             'email' => $email,
             'phone' => $phone,
-            'enquiry_type' => $enquiry_type,
-            'organisation_name' => $organisation_name,
+            'enquiry_type' => $enquiry,
+            'organisation_name' => $org,
             'street' => $street,
-            'address_2' => $address_2,
+            'address_2' => $addr2,
             'city' => $city,
             'state' => $county,
             'county' => $county,
             'country' => $country,
             'postcode' => $postcode,
             'samples' => $samples,
-            'blends' => array_values(array_map(function($sample) {
-                return $sample['name'];
-            }, $samples)),
+            'sample_names' => array_values(array_map(function($s){ return $s['name']; }, $samples)),
             'context' => [
-                'page_url' => esc_url_raw(wp_get_referer() ?: ''),
+                'page_url' => esc_url_raw(wp_unslash($_POST['page_url'] ?? '')),
+                'referrer' => esc_url_raw(wp_unslash($_POST['referrer'] ?? '')),
             ],
         ];
 
-        $idempotency_key = md5(wp_json_encode(['shortcode', $email, $selected_ids, date('Y-m-d-H')]));
-        $res = PBSR_Dispatcher::process($raw, 'permabound_sample_request', $idempotency_key);
+        $idem = md5(wp_json_encode(['pb_submit_samples', $email, $samples, date('Y-m-d-H')]));
+        $res = PBSR_Dispatcher::process($raw, 'permabound_sample_request', $idem);
 
         if (!empty($res['ok'])) {
-            wp_send_json_success([
-                'message' => 'Submission processed.',
-                'relay' => $res,
-            ]);
+            wp_send_json_success(['ok' => true, 'relay' => $res]);
         }
 
-        wp_send_json_error([
-            'message' => 'Relay processing failed.',
-            'relay' => $res,
-        ]);
+        wp_send_json_error(['message' => 'Relay processing failed.', 'relay' => $res]);
     }
 
-    private static function get_available_products() {
+    private static function get_available_products(array $category_slugs) {
         $settings = PBSR_Settings::get();
         $hidden = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
+        $grouped = [];
 
-        $products = get_posts([
-            'post_type' => ['product', 'products'],
-            'post_status' => 'publish',
-            'posts_per_page' => -1,
-            'orderby' => 'title',
-            'order' => 'ASC',
-            'fields' => 'ids',
-        ]);
-
-        $out = [];
-        foreach ($products as $product_id) {
-            if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
+        foreach ($category_slugs as $slug) {
+            $term = get_term_by('slug', $slug, 'product_category');
+            if (!$term || is_wp_error($term)) {
                 continue;
             }
 
-            $name = get_the_title($product_id);
-            $sku = self::get_product_sku($product_id);
+            $ids = get_posts([
+                'post_type' => ['product', 'products'],
+                'post_status' => 'publish',
+                'posts_per_page' => -1,
+                'orderby' => 'title',
+                'order' => 'ASC',
+                'fields' => 'ids',
+                'tax_query' => [[
+                    'taxonomy' => 'product_category',
+                    'field' => 'slug',
+                    'terms' => $slug,
+                ]],
+            ]);
 
-            if (self::is_product_hidden($product_id, $name, $sku, $hidden)) {
-                continue;
+            $items = [];
+            foreach ($ids as $product_id) {
+                if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
+                    continue;
+                }
+
+                $name = get_the_title($product_id);
+                $sku = self::get_product_sku($product_id);
+
+                if (self::is_product_hidden($product_id, $name, $sku, $hidden)) {
+                    continue;
+                }
+
+                $items[] = [
+                    'id' => (int) $product_id,
+                    'name' => $name,
+                    'sku' => $sku,
+                    'thumbnail' => get_the_post_thumbnail_url($product_id, 'medium_large'),
+                ];
             }
 
-            $out[] = [
-                'id' => $product_id,
-                'name' => $name,
-                'sku' => $sku,
-                'thumbnail' => get_the_post_thumbnail_url($product_id, 'thumbnail'),
-            ];
+            if (!empty($items)) {
+                $grouped[$term->name] = $items;
+            }
         }
 
-        return $out;
+        return $grouped;
     }
-
 
     private static function is_product_hidden($product_id, $name, $sku, array $hidden) {
         if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
@@ -411,33 +441,6 @@ class PBSR_Product_Selection_Form {
         }
 
         return array_values(array_unique($candidates));
-    }
-
-    private static function build_samples_from_ids(array $product_ids) {
-        if (empty($product_ids)) {
-            return [];
-        }
-
-        $available = self::get_available_products();
-        $available_by_id = [];
-        foreach ($available as $product) {
-            $available_by_id[(int) $product['id']] = $product;
-        }
-
-        $samples = [];
-        foreach ($product_ids as $id) {
-            if (empty($available_by_id[$id])) {
-                continue;
-            }
-
-            $product = $available_by_id[$id];
-            $samples[] = [
-                'name' => $product['name'],
-                'sku' => $product['sku'],
-            ];
-        }
-
-        return $samples;
     }
 }
 
