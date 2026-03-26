@@ -70,10 +70,11 @@ class PBSR_Installer {
                  WHERE request_status IS NULL
                     OR request_status = ''
                     OR requester_email IS NULL
-                    OR requester_email = ''
                     OR household_key IS NULL
                     OR lead_channel IS NULL
                     OR lead_channel = ''
+                    OR lead_source_detail IS NULL
+                    OR lead_source_detail = ''
                  ORDER BY id ASC
                  LIMIT 250",
                 ARRAY_A
