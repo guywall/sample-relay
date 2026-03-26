@@ -1,32 +1,39 @@
-<?php
-if (!defined('ABSPATH')) exit;
-
-// Hook runs on successful submission
-add_action('elementor_pro/forms/new_record', function($record, $handler) {
-    try {
-        $raw = [];
-        $fields = $record->get('fields');
-        foreach ($fields as $id => $field) {
-            $val = $field['value'];
-            // normalise checkbox fields to array
-            if (is_string($val) && strpos($val, ',') !== false) {
-                $val = array_map('trim', explode(',', $val));
-            }
-            $raw[$id] = $val;
-        }
-
-        // example: ensure we capture blends even if field IDs differ
-        // Map via settings[field_map] instead for full control
-
-        // Use Elementor's form ID + time as idempotency
-        $meta = $record->get('meta');
-        $form_id = $meta['form_name'] ?? 'elementor';
-        $key = md5(wp_json_encode([$form_id, $raw['email'] ?? '', $raw['blends'] ?? '', $raw['reference'] ?? '', date('Y-m-d-H')]));
-
-        $res = PBSR_Dispatcher::process($raw, 'elementor', $key);
-        // You could also set a dynamic response message here if needed
-
-    } catch (Throwable $e) {
-        // swallow to avoid breaking user flow; it’s logged inside dispatcher
-    }
-}, 10, 2);
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+add_action('elementor_pro/forms/new_record', function ($record, $handler) {
+    try {
+        $raw = [];
+        $fields = $record->get('fields');
+
+        foreach ($fields as $id => $field) {
+            $value = $field['value'];
+
+            if (is_string($value) && strpos($value, ',') !== false) {
+                $value = array_map('trim', explode(',', $value));
+            }
+
+            $raw[$id] = $value;
+        }
+
+        $meta = $record->get('meta');
+        $form_id = $meta['form_name'] ?? 'elementor';
+        $raw['context'] = [
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '',
+        ];
+
+        $key = md5(wp_json_encode([
+            $form_id,
+            $raw['email'] ?? '',
+            $raw['blends'] ?? '',
+            $raw['reference'] ?? '',
+            date('Y-m-d-H'),
+        ]));
+
+        PBSR_Dispatcher::process($raw, 'elementor', $key);
+    } catch (Throwable $e) {
+        error_log('PBSR Elementor relay error: ' . $e->getMessage());
+    }
+}, 10, 2);

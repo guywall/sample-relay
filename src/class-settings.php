@@ -38,6 +38,7 @@ class PBSR_Settings {
             'sample_cost_override' => '',
             'allowed_sources' => 'permabound_sample_request', // NEW setting
             'hidden_samples'  => '',
+            'repeat_limit_days' => 30,
         ];
 
         return wp_parse_args(get_option(self::OPT_KEY, []), $defaults);
