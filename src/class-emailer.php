@@ -38,6 +38,13 @@ class PBSR_Emailer {
             $message[] = 'Address: ' . $address;
         }
         $message[] = 'Samples: ' . implode(', ', $data['blends'] ?? []);
+        $project_type = array_values(array_filter((array) ($raw['project_type'] ?? [])));
+        if (!empty($project_type)) {
+            $message[] = 'Project Type: ' . implode(', ', $project_type);
+        }
+        if (($raw['project_size_m2'] ?? '') !== '') {
+            $message[] = 'Project Size (m2): ' . $raw['project_size_m2'];
+        }
         $message[] = 'Lead channel: ' . ($attribution['channel'] ?? 'Direct');
         $message[] = 'Lead detail: ' . ($attribution['source_detail'] ?? 'Direct');
         $message[] = 'Landing page: ' . ($attribution['landing_page'] ?? '');

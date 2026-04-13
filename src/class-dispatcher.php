@@ -107,7 +107,7 @@ class PBSR_Dispatcher {
                 $record_id = $decoded['data'][0]['details']['id'] ?? null;
 
                 if ($record_id) {
-                    $note = "Sample request blends:\n- " . implode("\n- ", $data['blends'] ?? []) . "\n\nNotes: " . ($data['notes'] ?? '');
+                    $note = self::buildCrmNote($data, $raw);
                     $crm->addNote($module, $record_id, $note);
                 }
             }
@@ -186,5 +186,29 @@ class PBSR_Dispatcher {
             (int) $days,
             $site_url
         );
+    }
+
+    private static function buildCrmNote(array $data, array $raw) {
+        $blends = array_values(array_filter($data['blends'] ?? []));
+        $project_type = array_values(array_filter((array) ($raw['project_type'] ?? [])));
+        $project_size = $raw['project_size_m2'] ?? '';
+
+        $note = [];
+        $note[] = 'Sample request blends:';
+        $note[] = !empty($blends) ? '- ' . implode("\n- ", $blends) : '- None supplied';
+
+        if (!empty($project_type)) {
+            $note[] = '';
+            $note[] = 'Project Type: ' . implode(', ', $project_type);
+        }
+
+        if ($project_size !== '' && $project_size !== null) {
+            $note[] = 'Project Size (m2): ' . $project_size;
+        }
+
+        $note[] = '';
+        $note[] = 'Notes: ' . ($data['notes'] ?? '');
+
+        return implode("\n", $note);
     }
 }

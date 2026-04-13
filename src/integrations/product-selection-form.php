@@ -196,6 +196,21 @@ class PBSR_Product_Selection_Form {
                     </div>
                 </div>
 
+                <div class="pb-grid">
+                    <div class="pb-field">
+                        <span class="pb-label">Project Type</span>
+                        <div class="pb-check-group">
+                            <label><input type="checkbox" name="project_type[]" value="Path/Patio"> Path/Patio</label>
+                            <label><input type="checkbox" name="project_type[]" value="Driveway"> Driveway</label>
+                            <label><input type="checkbox" name="project_type[]" value="Other"> Other</label>
+                        </div>
+                    </div>
+                    <div class="pb-field">
+                        <label for="pb-project-size">Project Size in m&sup2;</label>
+                        <input id="pb-project-size" name="project_size_m2" type="number" inputmode="numeric" min="0" step="1">
+                    </div>
+                </div>
+
                 <fieldset class="pb-address">
                     <legend>Shipping address</legend>
                     <label for="pb-street">Street</label>
@@ -265,6 +280,9 @@ class PBSR_Product_Selection_Form {
 #pb-samples-form .pb-review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 #pb-samples-form .pb-review-tile{aspect-ratio:1/1;position:relative;overflow:hidden}
 #pb-samples-form .pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#pb-samples-form .pb-check-group{display:grid;gap:8px}
+#pb-samples-form .pb-check-group label{display:flex;align-items:center;gap:8px}
+#pb-samples-form .pb-label{display:block;margin-bottom:6px;font-weight:600}
 .pb-status .ok{color:#166534}
 .pb-status .warn{color:#9a3412}
 .pb-status .err{color:#991b1b}
@@ -363,10 +381,24 @@ CSS;
                 var el = form.querySelector("#" + id);
                 return el && el.value ? el.value : "";
             }
+            function getCheckedValues(name){
+                return [].slice.call(form.querySelectorAll('input[name="' + name + '"]:checked')).map(function(input){
+                    return input.value || "";
+                }).filter(Boolean);
+            }
+
+            var projectTypes = getCheckedValues("project_type[]");
+            var projectSize = getValue("pb-project-size");
 
             out.push("<p><strong>Name:</strong> " + esc(getValue("pb-first")) + " " + esc(getValue("pb-last")) + "</p>");
             out.push("<p><strong>Email:</strong> " + esc(getValue("pb-email")) + "</p>");
             out.push("<p><strong>Phone:</strong> " + esc(getValue("pb-phone")) + "</p>");
+            if (projectTypes.length) {
+                out.push("<p><strong>Project type:</strong> " + esc(projectTypes.join(", ")) + "</p>");
+            }
+            if (projectSize) {
+                out.push("<p><strong>Project size:</strong> " + esc(projectSize) + " m&sup2;</p>");
+            }
             out.push("<p><strong>Selected products:</strong> " + esc(sels.join(", ")) + "</p>");
 
             var review = form.querySelector("#pb-review");
@@ -569,6 +601,9 @@ JS;
         $page_url = esc_url_raw(wp_unslash($_POST['page_url'] ?? ''));
         $referrer = esc_url_raw(wp_unslash($_POST['referrer'] ?? ''));
         $current_product = sanitize_text_field(wp_unslash($_POST['current_product'] ?? ''));
+        $project_type = self::sanitize_project_types((array) wp_unslash($_POST['project_type'] ?? []));
+        $project_size_raw = sanitize_text_field(wp_unslash($_POST['project_size_m2'] ?? ''));
+        $project_size = ($project_size_raw !== '' && preg_match('/^\d+$/', $project_size_raw)) ? (int) $project_size_raw : '';
 
         $product_names = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_names'] ?? ($_POST['product_selection'] ?? [])));
         $product_skus = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_skus'] ?? []));
@@ -617,6 +652,8 @@ JS;
             ],
             'samples' => $samples,
             'sample_names' => $product_names,
+            'project_type' => $project_type,
+            'project_size_m2' => $project_size,
             'context' => [
                 'page_url' => $page_url,
                 'referrer' => $referrer,
@@ -661,6 +698,13 @@ JS;
         }
 
         return '';
+    }
+
+    private static function sanitize_project_types(array $values) {
+        $allowed = ['Path/Patio', 'Driveway', 'Other'];
+        $sanitized = array_map('sanitize_text_field', $values);
+
+        return array_values(array_intersect($allowed, $sanitized));
     }
 }
 
