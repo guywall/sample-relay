@@ -31,11 +31,7 @@ class PBSR_Product_Selection_Form {
         $nonce = wp_create_nonce('pbsamples_nonce');
         $cats = array_filter(array_map('trim', explode(',', $atts['categories'])));
         $max = (int) $atts['max'];
-        $auto_check = '';
-
-        if (is_singular('product')) {
-            $auto_check = get_the_title(get_the_ID());
-        }
+        $auto_check = is_singular('product') ? get_the_title(get_the_ID()) : '';
 
         ob_start();
         ?>
@@ -154,83 +150,10 @@ class PBSR_Product_Selection_Form {
 
             <section class="pb-step" data-step="2" hidden>
                 <h3>Your details</h3>
-
                 <div class="pb-error-banner" role="alert" aria-live="polite"></div>
-
-                <div class="pb-grid">
-                    <div class="pb-field">
-                        <label for="pb-first">First name</label>
-                        <input id="pb-first" name="first_name" type="text" required>
-                    </div>
-                    <div class="pb-field">
-                        <label for="pb-last">Surname</label>
-                        <input id="pb-last" name="surname" type="text" required>
-                    </div>
+                <div class="pb-form-fields">
+                    <?php echo PBSR_Form_Fields::renderFields(); ?>
                 </div>
-                <div class="pb-grid">
-                    <div class="pb-field">
-                        <label for="pb-email">Email</label>
-                        <input id="pb-email" name="email" type="email" required>
-                    </div>
-                    <div class="pb-field">
-                        <label for="pb-phone">Phone</label>
-                        <input id="pb-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required>
-                    </div>
-                </div>
-
-                <div class="pb-grid">
-                    <div class="pb-field">
-                        <label for="pb-enquiry">Enquiry type</label>
-                        <select id="pb-enquiry" name="enquiry_type" required>
-                            <option value="">Please select</option>
-                            <option value="homeowner">Homeowner</option>
-                            <option value="contractor_installer">Contractor/Installer</option>
-                            <option value="merchant_reseller">Merchant/Reseller</option>
-                            <option value="local_authority">Local Authority</option>
-                            <option value="other">Other</option>
-                        </select>
-                    </div>
-                    <div class="pb-field" id="pb-org-wrap" style="display:none;">
-                        <label for="pb-org">Organisation name</label>
-                        <input id="pb-org" name="organisation_name" type="text">
-                    </div>
-                </div>
-
-                <fieldset class="pb-address">
-                    <legend>Shipping address</legend>
-                    <label for="pb-street">Street</label>
-                    <input id="pb-street" name="street" type="text" required>
-                    <label for="pb-address2">Address 2</label>
-                    <input id="pb-address2" name="address_2" type="text">
-                    <div class="pb-grid">
-                        <div class="pb-field">
-                            <label for="pb-city">Town/City</label>
-                            <input id="pb-city" name="city" type="text" required>
-                        </div>
-                        <div class="pb-field">
-                            <label for="pb-county">County</label>
-                            <input id="pb-county" name="county" type="text" required>
-                        </div>
-                    </div>
-                    <div class="pb-grid">
-                        <div class="pb-field">
-                            <label for="pb-country">Country</label>
-                            <input id="pb-country" name="country" type="text" required value="United Kingdom">
-                        </div>
-                        <div class="pb-field">
-                            <label for="pb-postcode">Postcode</label>
-                            <input id="pb-postcode" name="postcode" type="text" required>
-                        </div>
-                    </div>
-                </fieldset>
-
-                <div class="pb-consent">
-                    <label>
-                        <input type="checkbox" name="gdpr_consent" id="pb-gdpr" required>
-                        I agree to be contacted about my sample request and understand how my data will be used.
-                    </label>
-                </div>
-
                 <div class="pb-nav">
                     <button type="button" class="button" data-prev>Previous</button>
                     <button type="button" class="button button-primary" data-next>Next</button>
@@ -265,11 +188,16 @@ class PBSR_Product_Selection_Form {
 #pb-samples-form .pb-review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
 #pb-samples-form .pb-review-tile{aspect-ratio:1/1;position:relative;overflow:hidden}
 #pb-samples-form .pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#pb-samples-form .pb-form-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#pb-samples-form .pb-field{display:flex;flex-direction:column;gap:6px}
+#pb-samples-form .pb-field--checkbox{grid-column:1/-1}
+#pb-samples-form .pb-choice-inline,#pb-samples-form .pb-checkbox-label{display:block;margin:4px 0}
+#pb-samples-form .pb-help{color:#50575e}
 .pb-status .ok{color:#166534}
 .pb-status .warn{color:#9a3412}
 .pb-status .err{color:#991b1b}
 @media(max-width:1024px){#pb-samples-form .pb-products{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:768px){#pb-samples-form .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
+@media(max-width:768px){#pb-samples-form .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))!important}#pb-samples-form .pb-form-fields{grid-template-columns:1fr}}
 @media(max-width:640px){#pb-samples-form .pb-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 CSS;
         wp_register_style('pb-samples', false);
@@ -278,7 +206,10 @@ CSS;
 
         wp_register_script('pb-samples-js', '', [], PBSR_VER, true);
         wp_enqueue_script('pb-samples-js');
-        wp_localize_script('pb-samples-js', 'PBSAMPLES', ['ajax_url' => admin_url('admin-ajax.php')]);
+        wp_localize_script('pb-samples-js', 'PBSAMPLES', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'field_defs' => PBSR_Form_Fields::definitionsForJs(),
+        ]);
 
         $js = <<<'JS'
 (function(){
@@ -294,6 +225,56 @@ CSS;
         } catch (e) {
             return {};
         }
+    }
+
+    function getDefs(){
+        return Array.isArray(PBSAMPLES.field_defs) ? PBSAMPLES.field_defs : [];
+    }
+
+    function findDef(key){
+        return getDefs().find(function(def){ return def.key === key; }) || null;
+    }
+
+    function optionLabel(def, value){
+        if (!def || !Array.isArray(def.options)) {
+            return value;
+        }
+        var match = def.options.find(function(opt){ return opt.value === value; });
+        return match ? match.label : value;
+    }
+
+    function formValue(form, key){
+        var els = form.querySelectorAll('[name="' + key + '"]');
+        if (!els.length) {
+            return '';
+        }
+
+        var first = els[0];
+        if (first.type === 'radio') {
+            var checked = form.querySelector('[name="' + key + '"]:checked');
+            return checked ? checked.value : '';
+        }
+
+        if (first.type === 'checkbox') {
+            return first.checked ? '1' : '';
+        }
+
+        return first.value || '';
+    }
+
+    function conditionMatch(form, def){
+        if (!def || !def.condition_field || !def.condition_operator) {
+            return true;
+        }
+
+        var actual = formValue(form, def.condition_field);
+        if (def.condition_operator === 'equals') {
+            return actual === def.condition_value;
+        }
+        if (def.condition_operator === 'not_equals') {
+            return actual !== def.condition_value;
+        }
+        return true;
     }
 
     function scan(){
@@ -318,10 +299,9 @@ CSS;
         }
 
         function show(index){
-            steps.forEach(function(step, stepIndex){
-                step.hidden = stepIndex !== index;
+            steps.forEach(function(step, idx){
+                step.hidden = idx !== index;
             });
-
             if (index === 2) {
                 buildReview();
                 renderGrid();
@@ -336,7 +316,6 @@ CSS;
             if (page) {
                 page.value = window.location.href;
             }
-
             if (ref) {
                 ref.value = attr.referrer || document.referrer || "";
             }
@@ -345,29 +324,53 @@ CSS;
         function update(){
             var count = picks().length;
             var indicator = form.querySelector("#pb-step-indicator");
-
             if (indicator) {
                 indicator.textContent = count + "/" + max + " selected";
             }
-
             form.querySelectorAll(".pb-card").forEach(function(card){
                 var choice = card.querySelector(".pb-choice");
                 card.classList.toggle("is-selected", !!(choice && choice.checked));
             });
         }
 
+        function applyConditions(){
+            getDefs().forEach(function(def){
+                var wrapper = form.querySelector('[data-field-key="' + def.key + '"]');
+                if (!wrapper) {
+                    return;
+                }
+
+                var visible = conditionMatch(form, def);
+                wrapper.style.display = visible ? "" : "none";
+                wrapper.querySelectorAll('input,select,textarea').forEach(function(input){
+                    if (input.type === 'hidden') {
+                        return;
+                    }
+                    input.disabled = !visible;
+                });
+            });
+        }
+
         function buildReview(){
             var out = [];
-            var sels = picks().map(function(choice){ return choice.dataset.name || choice.value; });
-            function getValue(id){
-                var el = form.querySelector("#" + id);
-                return el && el.value ? el.value : "";
-            }
+            var selectedProducts = picks().map(function(choice){ return choice.dataset.name || choice.value; });
+            out.push("<p><strong>Selected products:</strong> " + esc(selectedProducts.join(", ")) + "</p>");
 
-            out.push("<p><strong>Name:</strong> " + esc(getValue("pb-first")) + " " + esc(getValue("pb-last")) + "</p>");
-            out.push("<p><strong>Email:</strong> " + esc(getValue("pb-email")) + "</p>");
-            out.push("<p><strong>Phone:</strong> " + esc(getValue("pb-phone")) + "</p>");
-            out.push("<p><strong>Selected products:</strong> " + esc(sels.join(", ")) + "</p>");
+            getDefs().forEach(function(def){
+                if (def.hidden || !conditionMatch(form, def)) {
+                    return;
+                }
+                var value = formValue(form, def.key);
+                if (!value) {
+                    return;
+                }
+                if (def.type === 'checkbox') {
+                    value = 'Yes';
+                } else {
+                    value = optionLabel(def, value);
+                }
+                out.push("<p><strong>" + esc(def.label) + ":</strong> " + esc(value) + "</p>");
+            });
 
             var review = form.querySelector("#pb-review");
             if (review) {
@@ -406,6 +409,10 @@ CSS;
                     card.style.display = (!query || name.indexOf(query) !== -1) ? "" : "none";
                 });
             }
+
+            if (e.target && e.target.name) {
+                applyConditions();
+            }
         });
 
         form.addEventListener("change", function(e){
@@ -417,11 +424,8 @@ CSS;
                 update();
             }
 
-            if (e.target && e.target.id === "pb-enquiry") {
-                var wrap = form.querySelector("#pb-org-wrap");
-                if (wrap) {
-                    wrap.style.display = (e.target.value && e.target.value !== "homeowner") ? "block" : "none";
-                }
+            if (e.target && e.target.name) {
+                applyConditions();
             }
         });
 
@@ -473,7 +477,6 @@ CSS;
                 .then(function(response){ return response.json(); })
                 .then(function(response){
                     var relay = response && response.data && response.data.relay ? response.data.relay : null;
-
                     if (!response || !response.success || !relay) {
                         if (status) {
                             status.innerHTML = "<p class=\"err\">" + ((response && response.data && response.data.message) || "Submission failed") + "</p>";
@@ -525,6 +528,7 @@ CSS;
         });
 
         setContext();
+        applyConditions();
         update();
         show(0);
     }
@@ -553,19 +557,12 @@ JS;
             wp_send_json_error(['message' => 'Invalid nonce.']);
         }
 
-        $first = sanitize_text_field(wp_unslash($_POST['first_name'] ?? ''));
-        $last = sanitize_text_field(wp_unslash($_POST['surname'] ?? ''));
-        $email = sanitize_email(wp_unslash($_POST['email'] ?? ''));
-        $phone = sanitize_text_field(wp_unslash($_POST['phone'] ?? ''));
-        $enquiry = sanitize_text_field(wp_unslash($_POST['enquiry_type'] ?? ''));
-        $org = sanitize_text_field(wp_unslash($_POST['organisation_name'] ?? ''));
-        $street = sanitize_text_field(wp_unslash($_POST['street'] ?? ''));
-        $addr2 = sanitize_text_field(wp_unslash($_POST['address_2'] ?? ''));
-        $city = sanitize_text_field(wp_unslash($_POST['city'] ?? ''));
-        $county = sanitize_text_field(wp_unslash($_POST['county'] ?? ''));
-        $country = sanitize_text_field(wp_unslash($_POST['country'] ?? ''));
-        $postcode = sanitize_text_field(wp_unslash($_POST['postcode'] ?? ''));
-        $gdpr = isset($_POST['gdpr_consent']) ? 'yes' : 'no';
+        $submission = PBSR_Form_Fields::collectSubmission($_POST);
+        if (!empty($submission['errors'])) {
+            wp_send_json_error(['message' => reset($submission['errors'])]);
+        }
+
+        $values = $submission['values'];
         $page_url = esc_url_raw(wp_unslash($_POST['page_url'] ?? ''));
         $referrer = esc_url_raw(wp_unslash($_POST['referrer'] ?? ''));
         $current_product = sanitize_text_field(wp_unslash($_POST['current_product'] ?? ''));
@@ -579,13 +576,13 @@ JS;
         }
 
         $product_names = array_values(array_slice(array_unique($product_names), 0, $max));
+        if (empty($product_names)) {
+            wp_send_json_error(['message' => 'Please select at least one sample.']);
+        }
+
         $aligned_skus = [];
         foreach ($product_names as $i => $name) {
             $aligned_skus[$i] = $product_skus[$i] ?? '';
-        }
-
-        if (!$first || !$last || !$email || !$phone || !$street || !$city || !$county || !$country || !$postcode || !$enquiry || $gdpr !== 'yes' || empty($product_names)) {
-            wp_send_json_error(['message' => 'Missing required fields.']);
         }
 
         $samples = [];
@@ -596,36 +593,37 @@ JS;
             ];
         }
 
-        $raw = [
-            'source' => 'permabound_sample_request',
-            'contact' => [
-                'first_name' => $first,
-                'last_name' => $last,
-                'email' => $email,
-                'phone' => $phone,
-                'enquiry_type' => $enquiry,
-                'organisation_name' => $org,
-                'gdpr_consent' => true,
-            ],
-            'shipping' => [
-                'street' => $street,
-                'address_2' => $addr2,
-                'city' => $city,
-                'county' => $county,
-                'country' => $country,
-                'postcode' => $postcode,
-            ],
-            'samples' => $samples,
-            'sample_names' => $product_names,
-            'context' => [
-                'page_url' => $page_url,
-                'referrer' => $referrer,
-                'current_product' => $current_product,
-                'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '',
-            ],
+        $raw = $values;
+        $raw['source'] = 'permabound_sample_request';
+        $raw['contact'] = [
+            'first_name' => $values['first_name'] ?? '',
+            'last_name' => $values['last_name'] ?? '',
+            'email' => $values['email'] ?? '',
+            'phone' => $values['phone'] ?? '',
+            'enquiry_type' => $values['enquiry_type'] ?? '',
+            'organisation_name' => $values['organisation_name'] ?? '',
+            'gdpr_consent' => !empty($values['gdpr_consent']),
+        ];
+        $raw['shipping'] = [
+            'street' => $values['street'] ?? '',
+            'address_2' => $values['address_2'] ?? '',
+            'city' => $values['city'] ?? '',
+            'county' => $values['county'] ?? '',
+            'country' => $values['country'] ?? '',
+            'postcode' => $values['postcode'] ?? '',
+        ];
+        $raw['samples'] = $samples;
+        $raw['sample_names'] = $product_names;
+        $raw['field_values'] = $values;
+        $raw['field_display_values'] = $submission['display'];
+        $raw['context'] = [
+            'page_url' => $page_url,
+            'referrer' => $referrer,
+            'current_product' => $current_product,
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '',
         ];
 
-        $idem = md5(wp_json_encode(['pb_submit_samples', $email, $samples, date('Y-m-d-H')]));
+        $idem = md5(wp_json_encode(['pb_submit_samples', $values['email'] ?? '', $samples, date('Y-m-d-H')]));
         $res = PBSR_Dispatcher::process($raw, 'permabound_sample_request', $idem);
 
         if (!empty($res['ok']) || ($res['status'] ?? '') === 'blocked') {

@@ -50,6 +50,12 @@ class PBSR_Emailer {
         $message[] = 'UTM content: ' . ($attribution['utm_content'] ?? '');
         $message[] = 'gclid: ' . ($attribution['gclid'] ?? '');
         $message[] = 'msclkid: ' . ($attribution['msclkid'] ?? '');
+        $extra_fields = $data['extra_field_display'] ?? [];
+        if (!empty($extra_fields)) {
+            foreach ($extra_fields as $row) {
+                $message[] = ($row['label'] ?? 'Field') . ': ' . ($row['value'] ?? '');
+            }
+        }
         $message[] = 'CRM Status: ' . ($result['crm_status'] ?? 'skipped');
         $message[] = 'Books Status: ' . ($result['books_status'] ?? 'skipped');
 

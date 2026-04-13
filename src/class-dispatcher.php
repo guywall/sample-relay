@@ -23,6 +23,10 @@ class PBSR_Dispatcher {
         $map = $settings['field_map'];
         $data = PBSR_Mapper::canonicalize($raw, $map);
         $data['blends'] = self::resolveBlends($raw, $map);
+        $data['field_values'] = !empty($raw['field_values']) && is_array($raw['field_values'])
+            ? $raw['field_values']
+            : PBSR_Form_Fields::extractValuesFromRaw($raw);
+        $data['extra_field_display'] = PBSR_Form_Fields::extraDisplayValues($data['field_values']);
 
         $hidden_samples = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
         if (!empty($hidden_samples) && !empty($raw['samples']) && is_array($raw['samples'])) {
@@ -174,6 +178,8 @@ class PBSR_Dispatcher {
         $raw['context'] = PBSR_Attribution::enrichContext($raw['context'] ?? []);
         $raw['blends'] = $data['blends'] ?? [];
         $raw['email'] = $data['email'] ?? ($raw['email'] ?? '');
+        $raw['field_values'] = $data['field_values'] ?? ($raw['field_values'] ?? []);
+        $raw['extra_field_display'] = $data['extra_field_display'] ?? [];
 
         return $raw;
     }
