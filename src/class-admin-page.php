@@ -47,6 +47,8 @@ class PBSR_Admin_Page {
         $crm_fields = PBSR_Zoho_Field_Manager::getCachedFields('crm');
         $books_contact_fields = PBSR_Zoho_Field_Manager::getCachedFields('books_contact');
         $books_document_fields = PBSR_Zoho_Field_Manager::getCachedFields('books_document');
+        $sync_errors = PBSR_Zoho_Field_Manager::getSyncErrors();
+        $legacy_mappings = PBSR_Zoho_Field_Manager::legacyMappingReference();
         ?>
         <div class="wrap">
             <h1>PERMABOUND Sample Relay</h1>
@@ -67,6 +69,10 @@ class PBSR_Admin_Page {
                 .pbsr-inline-note{margin-top:8px}
                 .pbsr-small{font-size:12px;color:#50575e}
             </style>
+
+            <?php self::render_mapping_datalist('pbsr-crm-targets', $crm_fields); ?>
+            <?php self::render_mapping_datalist('pbsr-books-contact-targets', $books_contact_fields); ?>
+            <?php self::render_mapping_datalist('pbsr-books-document-targets', $books_document_fields); ?>
 
             <div class="pbsr-flex">
                 <div class="pbsr-card">
@@ -190,7 +196,7 @@ class PBSR_Admin_Page {
 
                         <div class="pbsr-card" style="padding:16px 0 0;border:none;box-shadow:none;margin:0;">
                             <h2>Zoho Mapping Builder</h2>
-                            <p class="pbsr-helper">Each saved field can map to CRM, Books contact, and Books document targets at the same time. Save field changes first if a newly added field is missing here.</p>
+                            <p class="pbsr-helper">Each saved field can map to CRM, Books contact, and Books document targets at the same time. Save field changes first if a newly added field is missing here. You can type API names manually even if Zoho field sync is unavailable.</p>
                             <table class="pbsr-field-table">
                                 <thead>
                                     <tr>
@@ -208,13 +214,22 @@ class PBSR_Admin_Page {
                                             <strong><?php echo esc_html($field['label']); ?></strong><br>
                                             <span class="pbsr-small pbsr-mono"><?php echo esc_html($field['key']); ?></span>
                                         </td>
-                                        <td><?php self::render_mapping_select('pbsr_settings[mapping_rules][' . $field['key'] . '][crm]', $map['crm'] ?? '', $crm_fields, 'CRM'); ?></td>
-                                        <td><?php self::render_mapping_select('pbsr_settings[mapping_rules][' . $field['key'] . '][books_contact]', $map['books_contact'] ?? '', $books_contact_fields, 'Books contact'); ?></td>
-                                        <td><?php self::render_mapping_select('pbsr_settings[mapping_rules][' . $field['key'] . '][books_document]', $map['books_document'] ?? '', $books_document_fields, 'Books document'); ?></td>
+                                        <td><?php self::render_mapping_input('pbsr_settings[mapping_rules][' . $field['key'] . '][crm]', $map['crm'] ?? '', 'pbsr-crm-targets', 'CRM API name or custom field id'); ?></td>
+                                        <td><?php self::render_mapping_input('pbsr_settings[mapping_rules][' . $field['key'] . '][books_contact]', $map['books_contact'] ?? '', 'pbsr-books-contact-targets', 'Books contact target'); ?></td>
+                                        <td><?php self::render_mapping_input('pbsr_settings[mapping_rules][' . $field['key'] . '][books_document]', $map['books_document'] ?? '', 'pbsr-books-document-targets', 'Books document target'); ?></td>
                                     </tr>
                                 <?php endforeach; ?>
                                 </tbody>
                             </table>
+                            <p class="pbsr-small">The hidden system field <span class="pbsr-mono">full_name</span> is available for joined-name targets such as Zoho Books <span class="pbsr-mono">contact_name</span>.</p>
+                        </div>
+
+                        <div class="pbsr-card" style="padding:16px 0 0;border:none;box-shadow:none;margin:0;">
+                            <h2>Legacy Mapping Reference</h2>
+                            <p class="pbsr-helper">These were the built-in mappings before the mapping builder existed. They are shown here so you can recreate or adapt them in your saved mapping table.</p>
+                            <?php self::render_legacy_mapping_table('CRM defaults', $legacy_mappings['crm'] ?? []); ?>
+                            <?php self::render_legacy_mapping_table('Books contact defaults', $legacy_mappings['books_contact'] ?? []); ?>
+                            <?php self::render_legacy_mapping_table('Books document defaults', $legacy_mappings['books_document'] ?? []); ?>
                         </div>
 
                         <?php submit_button('Save Settings'); ?>
@@ -237,6 +252,15 @@ class PBSR_Admin_Page {
                         <li>Books contact fields: <?php echo esc_html(count($books_contact_fields)); ?></li>
                         <li>Books document fields: <?php echo esc_html(count($books_document_fields)); ?></li>
                     </ul>
+
+                    <?php if (!empty($sync_errors)) : ?>
+                        <h3>Last Sync Errors</h3>
+                        <ul>
+                            <?php foreach ($sync_errors as $scope => $error) : ?>
+                                <li><strong><?php echo esc_html(ucwords(str_replace('_', ' ', $scope))); ?>:</strong> <?php echo esc_html($error); ?></li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
                 </div>
             </div>
 
@@ -418,6 +442,10 @@ class PBSR_Admin_Page {
         if ($notice === 'sync_failed') {
             echo '<div class="notice notice-error"><p>' . esc_html($message ?: 'Zoho field sync failed.') . '</p></div>';
         }
+
+        if ($notice === 'sync_partial') {
+            echo '<div class="notice notice-warning"><p>' . esc_html($message ?: 'Zoho field sync partially completed.') . '</p></div>';
+        }
     }
 
     private static function render_field_row(array $field, $index, array $all_fields) {
@@ -481,18 +509,39 @@ class PBSR_Admin_Page {
         <?php
     }
 
-    private static function render_mapping_select($name, $selected, array $options, $placeholder) {
-        echo '<select name="' . esc_attr($name) . '">';
-        echo '<option value="">No mapping</option>';
+    private static function render_mapping_input($name, $selected, $list_id, $placeholder) {
+        echo '<input type="text" name="' . esc_attr($name) . '" value="' . esc_attr($selected) . '" list="' . esc_attr($list_id) . '" placeholder="' . esc_attr($placeholder) . '">';
+        echo '<div class="pbsr-small">' . esc_html($placeholder) . '</div>';
+    }
+
+    private static function render_mapping_datalist($id, array $options) {
+        echo '<datalist id="' . esc_attr($id) . '">';
         foreach ($options as $option) {
             $label = $option['label'] ?? ($option['target'] ?? '');
             if (!empty($option['custom'])) {
                 $label .= ' [Custom]';
             }
-            echo '<option value="' . esc_attr($option['target'] ?? '') . '"' . selected($selected, $option['target'] ?? '', false) . '>' . esc_html($label) . '</option>';
+            echo '<option value="' . esc_attr($option['target'] ?? '') . '" label="' . esc_attr($label) . '"></option>';
         }
-        echo '</select>';
-        echo '<div class="pbsr-small">' . esc_html($placeholder) . '</div>';
+        echo '</datalist>';
+    }
+
+    private static function render_legacy_mapping_table($title, array $rows) {
+        if (empty($rows)) {
+            return;
+        }
+
+        echo '<h3>' . esc_html($title) . '</h3>';
+        echo '<table class="pbsr-field-table">';
+        echo '<thead><tr><th>Source</th><th>Target</th><th>Notes</th></tr></thead><tbody>';
+        foreach ($rows as $row) {
+            echo '<tr>';
+            echo '<td><span class="pbsr-mono">' . esc_html($row['field'] ?? '') . '</span></td>';
+            echo '<td><span class="pbsr-mono">' . esc_html($row['target'] ?? '') . '</span></td>';
+            echo '<td>' . esc_html($row['note'] ?? '') . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
     }
 }
 

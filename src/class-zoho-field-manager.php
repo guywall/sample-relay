@@ -18,7 +18,7 @@ class PBSR_Zoho_Field_Manager {
         $result = self::syncAll();
         $args = [
             'page' => 'pbsr_admin',
-            'pbsr_notice' => empty($result['ok']) ? 'sync_failed' : 'sync_ok',
+            'pbsr_notice' => $result['status'] ?? (empty($result['ok']) ? 'sync_failed' : 'sync_ok'),
         ];
 
         if (!empty($result['message'])) {
@@ -33,30 +33,68 @@ class PBSR_Zoho_Field_Manager {
         $settings = PBSR_Settings::get();
         $client = new PBSR_Zoho_Client();
         $doc_type = ($settings['books_doc_type'] ?? 'salesorder') === 'estimate' ? 'estimates' : 'salesorders';
+        $existing_cache = isset($settings['zoho_field_cache']) && is_array($settings['zoho_field_cache']) ? $settings['zoho_field_cache'] : [];
+        $cache = $existing_cache;
+        $cache['synced_at'] = current_time('mysql');
+        $cache['errors'] = [];
+        $messages = [];
+        $successes = 0;
 
         try {
-            $cache = [
-                'crm' => self::fetchCRMFields($client, $settings['crm_module'] ?? 'Contacts'),
-                'books_contact' => self::fetchBooksFields($client, 'contacts'),
-                'books_document' => self::fetchBooksFields($client, $doc_type),
-                'synced_at' => current_time('mysql'),
-            ];
-
-            $new_settings = $settings;
-            $new_settings['zoho_field_cache'] = $cache;
-            PBSR_Settings::update($new_settings);
-
-            return [
-                'ok' => true,
-                'cache' => $cache,
-                'message' => 'Zoho fields synced successfully.',
-            ];
+            $cache['crm'] = self::fetchCRMFields($client, $settings['crm_module'] ?? 'Contacts');
+            $messages[] = sprintf('CRM fields synced: %d.', count($cache['crm']));
+            $successes++;
         } catch (Throwable $e) {
+            $cache['errors']['crm'] = $e->getMessage();
+            $messages[] = $e->getMessage();
+        }
+
+        try {
+            $cache['books_contact'] = self::fetchBooksFields($client, 'contacts');
+            $messages[] = sprintf('Books contact fields available: %d.', count($cache['books_contact']));
+            $successes++;
+        } catch (Throwable $e) {
+            $cache['errors']['books_contact'] = $e->getMessage();
+            $messages[] = $e->getMessage();
+        }
+
+        try {
+            $cache['books_document'] = self::fetchBooksFields($client, $doc_type);
+            $messages[] = sprintf('Books document fields available: %d.', count($cache['books_document']));
+            $successes++;
+        } catch (Throwable $e) {
+            $cache['errors']['books_document'] = $e->getMessage();
+            $messages[] = $e->getMessage();
+        }
+
+        $new_settings = $settings;
+        $new_settings['zoho_field_cache'] = $cache;
+        PBSR_Settings::update($new_settings);
+
+        if ($successes === 0) {
             return [
                 'ok' => false,
-                'message' => $e->getMessage(),
+                'status' => 'sync_failed',
+                'cache' => $cache,
+                'message' => implode(' ', $messages),
             ];
         }
+
+        if (!empty($cache['errors'])) {
+            return [
+                'ok' => true,
+                'status' => 'sync_partial',
+                'cache' => $cache,
+                'message' => implode(' ', $messages),
+            ];
+        }
+
+        return [
+            'ok' => true,
+            'status' => 'sync_ok',
+            'cache' => $cache,
+            'message' => 'Zoho fields synced successfully.',
+        ];
     }
 
     public static function getCachedFields($scope) {
@@ -76,12 +114,55 @@ class PBSR_Zoho_Field_Manager {
             return self::defaultBooksDocumentFields(($settings['books_doc_type'] ?? 'salesorder') === 'estimate' ? 'estimates' : 'salesorders');
         }
 
+        if ($scope === 'crm') {
+            return self::defaultCRMFields($settings['crm_module'] ?? 'Contacts');
+        }
+
         return [];
     }
 
     public static function lastSyncedAt() {
         $settings = PBSR_Settings::get();
         return $settings['zoho_field_cache']['synced_at'] ?? '';
+    }
+
+    public static function getSyncErrors() {
+        $settings = PBSR_Settings::get();
+        $cache = isset($settings['zoho_field_cache']) && is_array($settings['zoho_field_cache']) ? $settings['zoho_field_cache'] : [];
+        return isset($cache['errors']) && is_array($cache['errors']) ? $cache['errors'] : [];
+    }
+
+    public static function legacyMappingReference() {
+        return [
+            'crm' => [
+                ['field' => 'last_name', 'target' => 'Last_Name', 'note' => 'Sent as the primary surname field.'],
+                ['field' => 'first_name', 'target' => 'First_Name', 'note' => 'Sent as the CRM first name field.'],
+                ['field' => 'email', 'target' => 'Email', 'note' => 'Sent on each CRM upsert.'],
+                ['field' => 'phone', 'target' => 'Phone', 'note' => 'Sent on each CRM upsert.'],
+                ['field' => 'notes', 'target' => 'Description', 'note' => 'Copied into the CRM description field.'],
+                ['field' => '(fixed value)', 'target' => 'Lead_Source', 'note' => 'Always set to "Sample Request".'],
+            ],
+            'books_contact' => [
+                ['field' => 'full_name (first_name + last_name)', 'target' => 'contact_name', 'note' => 'Joined into a single Books contact name.'],
+                ['field' => 'organisation_name / company', 'target' => 'company_name', 'note' => 'Used for the company name when present.'],
+                ['field' => 'email', 'target' => 'email', 'note' => 'Also copied into the primary contact person email.'],
+                ['field' => 'phone', 'target' => 'phone', 'note' => 'Also copied into the primary contact person phone.'],
+                ['field' => 'first_name', 'target' => 'contact_persons[0].first_name', 'note' => 'Primary contact first name.'],
+                ['field' => 'last_name', 'target' => 'contact_persons[0].last_name', 'note' => 'Primary contact surname.'],
+                ['field' => 'street', 'target' => 'billing_address.address', 'note' => 'Also copied to shipping address.'],
+                ['field' => 'city', 'target' => 'billing_address.city', 'note' => 'Also copied to shipping city.'],
+                ['field' => 'state / county', 'target' => 'billing_address.state', 'note' => 'Also copied to shipping state.'],
+                ['field' => 'postcode', 'target' => 'billing_address.zip', 'note' => 'Also copied to shipping postcode.'],
+                ['field' => 'country', 'target' => 'billing_address.country', 'note' => 'Also copied to shipping country and VAT treatment.'],
+                ['field' => 'full_name (first_name + last_name)', 'target' => 'shipping_address.attention', 'note' => 'Used as the shipping attention line.'],
+                ['field' => '(fixed value)', 'target' => 'contact_type', 'note' => 'Always set to "customer".'],
+            ],
+            'books_document' => [
+                ['field' => 'reference', 'target' => 'reference_number', 'note' => 'Used on the Books sales order or estimate.'],
+                ['field' => 'notes', 'target' => 'notes', 'note' => 'Copied to the document notes field.'],
+                ['field' => 'selected sample SKUs', 'target' => 'line_items', 'note' => 'Mapped separately through the SKU mapper, not the field table.'],
+            ],
+        ];
     }
 
     public static function applyCRMMappings(array &$record, array $field_values, array $mapping_rules = [], array $crm_cache = []) {
@@ -122,9 +203,13 @@ class PBSR_Zoho_Field_Manager {
 
     private static function fetchCRMFields(PBSR_Zoho_Client $client, $module) {
         $module = trim((string) $module);
+        if ($module === '') {
+            throw new Exception('Unable to fetch Zoho CRM fields because no CRM module is selected.');
+        }
+
         $res = $client->crm_get('/settings/fields?module=' . rawurlencode($module));
         if (($res['code'] ?? 0) !== 200 || empty($res['body']['fields']) || !is_array($res['body']['fields'])) {
-            throw new Exception('Unable to fetch Zoho CRM fields for module ' . $module . '.');
+            throw new Exception(self::buildCRMFieldErrorMessage($module, $res));
         }
 
         $out = [];
@@ -249,6 +334,25 @@ class PBSR_Zoho_Field_Manager {
         ];
     }
 
+    private static function defaultCRMFields($module) {
+        $module = trim((string) $module);
+        $common = [
+            ['label' => 'First Name', 'target' => 'First_Name', 'api_name' => 'First_Name', 'type' => 'text', 'custom' => false, 'read_only' => false],
+            ['label' => 'Last Name', 'target' => 'Last_Name', 'api_name' => 'Last_Name', 'type' => 'text', 'custom' => false, 'read_only' => false],
+            ['label' => 'Email', 'target' => 'Email', 'api_name' => 'Email', 'type' => 'email', 'custom' => false, 'read_only' => false],
+            ['label' => 'Phone', 'target' => 'Phone', 'api_name' => 'Phone', 'type' => 'text', 'custom' => false, 'read_only' => false],
+            ['label' => 'Description', 'target' => 'Description', 'api_name' => 'Description', 'type' => 'textarea', 'custom' => false, 'read_only' => false],
+        ];
+
+        if (strcasecmp($module, 'Leads') === 0) {
+            $common[] = ['label' => 'Lead Source', 'target' => 'Lead_Source', 'api_name' => 'Lead_Source', 'type' => 'picklist', 'custom' => false, 'read_only' => false];
+            $common[] = ['label' => 'Company', 'target' => 'Company', 'api_name' => 'Company', 'type' => 'text', 'custom' => false, 'read_only' => false];
+        }
+
+        usort($common, [__CLASS__, 'sortFields']);
+        return $common;
+    }
+
     private static function defaultBooksDocumentFields($entity) {
         return [
             ['label' => ucfirst($entity) . ' Reference Number', 'target' => 'reference_number', 'api_name' => 'reference_number', 'type' => 'text', 'custom' => false],
@@ -305,6 +409,77 @@ class PBSR_Zoho_Field_Manager {
 
     private static function sortFields(array $a, array $b) {
         return strcasecmp((string) ($a['label'] ?? ''), (string) ($b['label'] ?? ''));
+    }
+
+    private static function buildCRMFieldErrorMessage($module, array $response) {
+        $code = (int) ($response['code'] ?? 0);
+        $body = isset($response['body']) && is_array($response['body']) ? $response['body'] : [];
+        $details = self::extractErrorDetail($body);
+        $message = 'Unable to fetch Zoho CRM fields for module ' . $module;
+
+        if ($code > 0) {
+            $message .= ' (HTTP ' . $code . ')';
+        }
+
+        if ($details !== '') {
+            $message .= ': ' . $details;
+        } else {
+            $message .= '.';
+        }
+
+        return $message;
+    }
+
+    private static function extractErrorDetail(array $body) {
+        $candidates = [
+            $body['message'] ?? '',
+            $body['code'] ?? '',
+        ];
+
+        if (!empty($body['details']) && is_array($body['details'])) {
+            foreach ($body['details'] as $key => $value) {
+                if (is_scalar($value) && $value !== '') {
+                    $candidates[] = $key . ': ' . $value;
+                }
+            }
+        }
+
+        if (!empty($body['data'][0]) && is_array($body['data'][0])) {
+            foreach (['message', 'code', 'details'] as $key) {
+                if (empty($body['data'][0][$key])) {
+                    continue;
+                }
+
+                if (is_array($body['data'][0][$key])) {
+                    $candidates[] = wp_json_encode($body['data'][0][$key]);
+                } else {
+                    $candidates[] = (string) $body['data'][0][$key];
+                }
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') {
+                return self::truncateMessage($candidate, 220);
+            }
+        }
+
+        $json = wp_json_encode($body);
+        if (!empty($json) && $json !== '[]' && $json !== '{}') {
+            return self::truncateMessage($json, 220);
+        }
+
+        return '';
+    }
+
+    private static function truncateMessage($message, $limit) {
+        $message = trim((string) $message);
+        if (strlen($message) <= $limit) {
+            return $message;
+        }
+
+        return rtrim(substr($message, 0, $limit - 3)) . '...';
     }
 }
 

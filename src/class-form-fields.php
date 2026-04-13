@@ -18,6 +18,10 @@ class PBSR_Form_Fields {
         'gdpr_consent',
     ];
 
+    private static $computed_keys = [
+        'full_name',
+    ];
+
     public static function getDefinitions() {
         $settings = PBSR_Settings::get();
         $saved = isset($settings['form_fields']) && is_array($settings['form_fields']) ? $settings['form_fields'] : [];
@@ -142,6 +146,8 @@ class PBSR_Form_Fields {
             $values[$key] = self::extractSubmittedValue($field, $source);
         }
 
+        $values = self::applyComputedValues($values, $definitions);
+
         $errors = [];
         foreach ($definitions as $field) {
             if (!self::shouldValidateField($field, $values)) {
@@ -163,14 +169,15 @@ class PBSR_Form_Fields {
 
     public static function extractValuesFromRaw(array $raw) {
         $values = [];
-        foreach (self::getDefinitions() as $field) {
+        $definitions = self::getDefinitions();
+        foreach ($definitions as $field) {
             $key = $field['key'];
             if (array_key_exists($key, $raw)) {
                 $values[$key] = self::sanitizeValueByType($field, $raw[$key]);
             }
         }
 
-        return $values;
+        return self::applyComputedValues($values, $definitions);
     }
 
     public static function buildDisplayValues(array $values, array $definitions = null) {
@@ -225,6 +232,22 @@ class PBSR_Form_Fields {
 
     private static function defaultDefinitions() {
         return [
+            [
+                'key' => 'full_name',
+                'label' => 'Full name',
+                'type' => 'hidden',
+                'required' => 0,
+                'default_value' => '',
+                'placeholder' => '',
+                'help_text' => '',
+                'options' => [],
+                'condition_field' => '',
+                'condition_operator' => '',
+                'condition_value' => '',
+                'locked' => 1,
+                'hidden' => 1,
+                'system' => 1,
+            ],
             [
                 'key' => 'first_name',
                 'label' => 'First name',
@@ -474,6 +497,7 @@ class PBSR_Form_Fields {
             'condition_value' => '',
             'locked' => 0,
             'hidden' => 0,
+            'system' => 0,
         ];
     }
 
@@ -485,9 +509,10 @@ class PBSR_Form_Fields {
         $field['placeholder'] = sanitize_text_field($row['placeholder'] ?? '');
         $field['help_text'] = sanitize_text_field($row['help_text'] ?? '');
         $field['default_value'] = sanitize_text_field($row['default_value'] ?? '');
-        $field['required'] = !empty($base['locked']) ? 1 : (empty($row['required']) ? 0 : 1);
+        $field['required'] = !empty($base['locked']) ? (empty($base['required']) ? 0 : 1) : (empty($row['required']) ? 0 : 1);
         $field['hidden'] = !empty($row['hidden']) ? 1 : 0;
         $field['locked'] = !empty($base['locked']) ? 1 : 0;
+        $field['system'] = !empty($base['system']) ? 1 : 0;
 
         $type = sanitize_key($row['type'] ?? $base['type']);
         if (!in_array($type, $allowed_types, true)) {
@@ -495,7 +520,7 @@ class PBSR_Form_Fields {
         }
         if (!empty($base['locked'])) {
             $type = $base['type'];
-            $field['hidden'] = 0;
+            $field['hidden'] = !empty($base['hidden']) ? 1 : 0;
             $field['condition_field'] = '';
             $field['condition_operator'] = '';
             $field['condition_value'] = '';
@@ -726,6 +751,32 @@ class PBSR_Form_Fields {
         }
 
         return trim((string) $value) === '';
+    }
+
+    private static function applyComputedValues(array $values, array $definitions) {
+        $keys = [];
+        foreach ($definitions as $field) {
+            if (!empty($field['key'])) {
+                $keys[$field['key']] = true;
+            }
+        }
+
+        if (isset($keys['full_name'])) {
+            $values['full_name'] = self::buildFullName($values['first_name'] ?? '', $values['last_name'] ?? '');
+        }
+
+        return $values;
+    }
+
+    private static function buildFullName($first_name, $last_name) {
+        $parts = array_filter([
+            trim((string) $first_name),
+            trim((string) $last_name),
+        ], function ($part) {
+            return $part !== '';
+        });
+
+        return implode(' ', $parts);
     }
 
     private static function formatDisplayValue(array $field, $value) {
