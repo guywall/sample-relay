@@ -100,6 +100,13 @@ class PBSR_Admin_Page {
                             <br><small>Requests from the same email or household are blocked until this window expires.</small>
                         </td>
                     </tr>
+                    <tr>
+                        <th>Google Places API Key</th>
+                        <td>
+                            <input type="text" name="pbsr_settings[google_places_api_key]" value="<?php echo esc_attr($s['google_places_api_key'] ?? ''); ?>" style="width:400px;" autocomplete="off">
+                            <br><small>Used for address autocomplete on the sample request form. Store a rotated, referrer-restricted key here instead of hardcoding it in the plugin.</small>
+                        </td>
+                    </tr>
                 </table>
 
                 <h3>Email Notifications</h3>

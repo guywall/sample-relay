@@ -281,6 +281,8 @@ class PBSR_Product_Selection_Form {
     }
 
     public static function enqueue_assets() {
+        $settings = PBSR_Settings::get();
+
         $css = <<<'CSS'
 .pb-no-postcode{margin-top:4px;color:#555}
 .pb-no-postcode input[type="checkbox"]{accent-color:var(--pb-brand,#ff9f23)}
@@ -402,7 +404,10 @@ CSS;
 
         wp_register_script('pb-samples-js', '', [], PBSR_VER, true);
         wp_enqueue_script('pb-samples-js');
-        wp_localize_script('pb-samples-js', 'PBSAMPLES', ['ajax_url' => admin_url('admin-ajax.php')]);
+        wp_localize_script('pb-samples-js', 'PBSAMPLES', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'google_places_api_key' => (string) ($settings['google_places_api_key'] ?? ''),
+        ]);
 
     $js = '
     (function(){
@@ -1038,10 +1043,18 @@ autocomplete.addListener("place_changed", function () {
             window.initPbAddressAutocomplete();
             return;
         }
+        var apiKey = (window.PBSAMPLES && PBSAMPLES.google_places_api_key) ? String(PBSAMPLES.google_places_api_key) : "";
+        if (!apiKey) {
+            return;
+        }
+        if (document.querySelector("script[data-pb-google-places=\'1\']")) {
+            return;
+        }
         const s = document.createElement("script");
-        s.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyBxKqn1sTfyz3FF7105u5Dfi-NvOxMTuNQ&libraries=places&callback=initPbAddressAutocomplete&loading=async";
+        s.src = "https://maps.googleapis.com/maps/api/js?key=" + encodeURIComponent(apiKey) + "&libraries=places&callback=initPbAddressAutocomplete&loading=async";
         s.async = true;
         s.defer = true;
+        s.setAttribute("data-pb-google-places", "1");
         document.head.appendChild(s);
     }
 
@@ -1070,7 +1083,6 @@ autocomplete.addListener("place_changed", function () {
     })();
     ';
     wp_add_inline_script('pb-samples-js', $js);
-        wp_add_inline_script('pb-samples-js', $js);
     }
 
     public static function handle_submission() {

@@ -39,6 +39,7 @@ class PBSR_Settings {
             'allowed_sources' => 'permabound_sample_request', // NEW setting
             'hidden_samples'  => '',
             'repeat_limit_days' => 30,
+            'google_places_api_key' => '',
         ];
 
         return wp_parse_args(get_option(self::OPT_KEY, []), $defaults);
