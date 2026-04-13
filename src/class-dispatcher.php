@@ -1,225 +1,196 @@
 <?php
-
-if (!defined('ABSPATH')) exit;
-
-
+if (!defined('ABSPATH')) {
+    exit;
+}
 
 class PBSR_Dispatcher {
-
-    public static function process(array $raw, $source='elementor', $idempotency_key=null) {
-		
-		        // ---- HARD GATE: only process approved sources ----
-        $settings       = PBSR_Settings::get();
-        $allowed_raw    = $settings['allowed_sources'] ?? '';
-        $allowed_list   = array_filter(array_map('trim', explode(',', strtolower($allowed_raw))));
-        // Source can be passed in the payload, or via the $source arg from a hook
+    public static function process(array $raw, $source = 'elementor', $idempotency_key = null) {
+        $settings = PBSR_Settings::get();
+        $allowed_raw = $settings['allowed_sources'] ?? '';
+        $allowed_list = array_filter(array_map('trim', explode(',', strtolower($allowed_raw))));
         $incoming_source = strtolower(trim($raw['source'] ?? $source ?? ''));
 
-        // If missing or not on the whitelist, skip silently (no logs, no emails, no API)
-        if (empty($incoming_source) || (!empty($allowed_list) && !in_array($incoming_source, $allowed_list, true))) {
-            return ['ok' => true, 'skipped' => true, 'reason' => 'source_not_allowed'];
-        }
-        // ---------------------------------------------------
-
-        $settings = PBSR_Settings::get();
-
-        $map      = $settings['field_map'];
-		
-		// --- FLATTEN NESTED STRUCTURES BEFORE MAPPING ---
-		if (isset($raw['contact']) && is_array($raw['contact'])) {
-			foreach ($raw['contact'] as $k => $v) {
-				if (!isset($raw[$k]) || $raw[$k] === '') {
-					$raw[$k] = $v;
-				}
-			}
-		}
-		if (isset($raw['shipping']) && is_array($raw['shipping'])) {
-			foreach ($raw['shipping'] as $k => $v) {
-				if (!isset($raw[$k]) || $raw[$k] === '') {
-					$raw[$k] = $v;
-				}
-			}
-		}
-		// -----------------------------------------------
-
-
-        $data     = PBSR_Mapper::canonicalize($raw, $map);
-		
-		
-
-
-        // Ensure blends is array
-
-        $blends = $raw[$map['blends']] ?? $raw['blends'] ?? [];
-
-        if (is_string($blends)) {
-
-            $blends = array_filter(array_map('trim', preg_split('/[,;\n]+/', $blends)));
-
+        if ($incoming_source === '' || (!empty($allowed_list) && !in_array($incoming_source, $allowed_list, true))) {
+            return [
+                'ok' => true,
+                'status' => 'skipped',
+                'message' => 'Source not allowed.',
+                'blocked_reason' => 'source_not_allowed',
+            ];
         }
 
-        $data['blends'] = $blends;
+        $raw = self::flattenPayload($raw);
+        $map = $settings['field_map'];
+        $data = PBSR_Mapper::canonicalize($raw, $map);
+        $data['blends'] = self::resolveBlends($raw, $map);
+        $data['field_values'] = !empty($raw['field_values']) && is_array($raw['field_values'])
+            ? $raw['field_values']
+            : PBSR_Form_Fields::extractValuesFromRaw($raw);
+        $data['extra_field_display'] = PBSR_Form_Fields::extraDisplayValues($data['field_values']);
 
+        $hidden_samples = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
+        if (!empty($hidden_samples) && !empty($raw['samples']) && is_array($raw['samples'])) {
+            $raw['samples'] = PBSR_Mapper::filterAvailableSamples($raw['samples'], $hidden_samples);
+            $data['blends'] = array_values(array_filter(array_map(function ($sample) {
+                return trim((string) ($sample['name'] ?? ''));
+            }, $raw['samples'])));
+        }
 
+        $raw['context'] = PBSR_Attribution::enrichContext($raw['context'] ?? []);
+        $raw['source'] = $incoming_source;
+        $raw['email'] = $data['email'] ?? '';
+        $raw['street'] = $raw['street'] ?? ($data['street'] ?? '');
+        $raw['postcode'] = $raw['postcode'] ?? ($data['zip'] ?? '');
 
-        // Idempotency key
-
-        $key = $idempotency_key ?: md5(wp_json_encode([$source, $data['email'] ?? '', $blends, $data['reference'] ?? '', $data['street'] ?? '', time() - (time()%3600)]));
-
-
+        $key = $idempotency_key ?: md5(wp_json_encode([
+            $incoming_source,
+            $data['email'] ?? '',
+            $data['blends'] ?? [],
+            $data['reference'] ?? '',
+            $raw['street'] ?? '',
+            time() - (time() % 3600),
+        ]));
 
         if (PBSR_Logger::existsKey($key)) {
+            PBSR_Logger::incrementRetryCount($key);
 
-            return ['ok' => true, 'message' => 'Duplicate ignored (idempotent).', 'key' => $key];
-
+            return [
+                'ok' => true,
+                'status' => 'duplicate',
+                'message' => 'This request has already been received.',
+                'key' => $key,
+            ];
         }
 
+        $repeat_limit_days = max(1, (int) ($settings['repeat_limit_days'] ?? 30));
+        $household_key = PBSR_Logger::buildHouseholdKey($raw['street'] ?? '', $raw['postcode'] ?? '');
+        $recent_match = PBSR_Logger::findRecentAcceptedMatch($data['email'] ?? '', $household_key, $repeat_limit_days);
 
+        if (!empty($recent_match)) {
+            $result = [
+                'ok' => true,
+                'status' => 'blocked',
+                'message' => self::repeatLimitMessage($repeat_limit_days),
+                'blocked_reason' => 'repeat_limit',
+                'key' => $key,
+                'crm_status' => 'skipped',
+                'books_status' => 'skipped',
+            ];
 
-        $crm_status = $books_status = 'skipped';
+            PBSR_Logger::write($incoming_source, $key, self::buildLogPayload($raw, $data), 'skipped', null, 'skipped', null, 0, 'blocked', 'repeat_limit');
+            PBSR_Emailer::sendAdminNotification($settings, $data, $raw, $result);
 
-        $crm_resp = $books_resp = null;
+            return $result;
+        }
 
-
+        $crm_status = 'skipped';
+        $books_status = 'skipped';
+        $crm_resp = null;
+        $books_resp = null;
 
         $client = new PBSR_Zoho_Client();
-
-        $books  = new PBSR_Zoho_Books($client);
-
-        $crm    = new PBSR_Zoho_CRM($client);
-
-
+        $books = new PBSR_Zoho_Books($client);
+        $crm = new PBSR_Zoho_CRM($client);
 
         try {
+            $line_items = PBSR_Mapper::blendsToLineItemsFromSamples($raw['samples'] ?? [], $books);
 
-            // Build line items from blends → SKU map
-
-			$line_items = PBSR_Mapper::blendsToLineItemsFromSamples($raw['samples'] ?? [], $books);
-
-			error_log('LINE ITEMS: ' . wp_json_encode($line_items));
-
-            if ($settings['enable_books']) {
-
+            if (!empty($settings['enable_books'])) {
                 [$bcode, $bbody] = $books->createDocument($data, $line_items);
-
-                $books_status = (string)$bcode; $books_resp = $bbody;
-
+                $books_status = (string) $bcode;
+                $books_resp = $bbody;
             }
 
-
-
-            if ($settings['enable_crm']) {
-
+            if (!empty($settings['enable_crm'])) {
                 [$ccode, $cbody] = $crm->upsertPerson($data);
+                $crm_status = (string) $ccode;
+                $crm_resp = $cbody;
 
-                $crm_status = (string)$ccode; $crm_resp = $cbody;
+                $decoded = json_decode((string) $cbody, true);
+                $module = $settings['crm_module'] ?: 'Contacts';
+                $record_id = $decoded['data'][0]['details']['id'] ?? null;
 
-
-
-                // Try to attach a note to the first upserted record if available (best-effort)
-
-                $decoded = json_decode($cbody, true);
-
-                $module  = $settings['crm_module'] ?: 'Contacts';
-
-                $rid = $decoded['data'][0]['details']['id'] ?? null;
-
-                if ($rid) {
-
+                if ($record_id) {
                     $note = "Sample request blends:\n- " . implode("\n- ", $data['blends'] ?? []) . "\n\nNotes: " . ($data['notes'] ?? '');
-
-                    $crm->addNote($module, $rid, $note);
-
+                    $crm->addNote($module, $record_id, $note);
                 }
-
             }
 
-			// Optional email notification
-if (!empty($settings['enable_notify']) && !empty($settings['notify_emails'])) {
-    $recipients = array_map('trim', explode(',', $settings['notify_emails']));
+            $result = [
+                'ok' => true,
+                'status' => 'accepted',
+                'message' => 'Sample request received.',
+                'key' => $key,
+                'crm_status' => $crm_status,
+                'books_status' => $books_status,
+            ];
 
-    // Address (same pattern as pb_submit_samples)
-    $street   = $raw['street']    ?? '';
-    $addr2    = $raw['address_2'] ?? '';
-    $city     = $raw['city']      ?? '';
-    $county   = $raw['county']    ?? '';
-    $country  = $raw['country']   ?? '';
-    $postcode = $raw['postcode']  ?? ($data['zip'] ?? '');
+            PBSR_Logger::write($incoming_source, $key, self::buildLogPayload($raw, $data), $crm_status, $crm_resp, $books_status, $books_resp, 0, 'accepted');
+            PBSR_Emailer::sendAdminNotification($settings, $data, $raw, $result);
+            PBSR_Emailer::sendRequesterConfirmation($data, $raw);
 
-    $full_address = trim(
-        $street
-        . ($addr2 ? ', ' . $addr2 : '')
-        . ($city   ? ', ' . $city   : '')
-        . ($county ? ', ' . $county : '')
-        . ($country ? ', ' . $country : '')
-        . ($postcode ? ' ' . $postcode : '')
-    );
+            return $result;
+        } catch (Throwable $e) {
+            PBSR_Logger::write($incoming_source, $key, self::buildLogPayload($raw, $data), $crm_status, $crm_resp, 'error', $e->getMessage(), 0, 'skipped', 'internal_error');
 
-    // Context: page, referrer, UTM
-    $context   = $raw['context'] ?? [];
-    $page_url  = $context['page_url']  ?? '';
-    $referrer  = $context['referrer']  ?? '';
-    $utm       = $context['utm']       ?? [];
-    $utm_src   = $utm['utm_source']   ?? '';
-    $utm_med   = $utm['utm_medium']   ?? '';
-    $utm_camp  = $utm['utm_campaign'] ?? '';
-
-    $subject = 'New PERMABOUND Sample Request';
-    $message  = "A new sample request has been received.\n\n";
-
-    $message .= "Name: " . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? '')) . "\n";
-    $message .= "Company: " . ($data['company'] ?? $data['organisation_name'] ?? '') . "\n";
-    $message .= "Email: " . ($data['email'] ?? '') . "\n";
-    $message .= "Phone: " . ($data['phone'] ?? '') . "\n";
-
-    if ($full_address !== '') {
-        $message .= "Address: {$full_address}\n";
-    }
-
-    $message .= "Blends: " . implode(', ', $data['blends'] ?? []) . "\n";
-
-    // Same style as your original snippet
-    if ($page_url) {
-        $message .= "Page: {$page_url}\n";
-    }
-    if ($referrer) {
-        $message .= "Referrer: {$referrer}\n";
-    }
-
-    // Simple UTM line if present
-    if ($utm_src || $utm_med || $utm_camp) {
-        $parts = [];
-        if ($utm_src)  $parts[] = "source={$utm_src}";
-        if ($utm_med)  $parts[] = "medium={$utm_med}";
-        if ($utm_camp) $parts[] = "campaign={$utm_camp}";
-        $message .= "UTM: " . implode(', ', $parts) . "\n";
-    }
-
-    $message .= "\nCRM Status: {$crm_status}\nBooks Status: {$books_status}\n\n";
-    $message .= "This message was generated automatically by the Sample Relay plugin.";
-
-    $headers = ['Content-Type: text/plain; charset=UTF-8'];
-
-    foreach ($recipients as $to) {
-        if (is_email($to)) {
-            wp_mail($to, $subject, $message, $headers);
+            return [
+                'ok' => false,
+                'status' => 'skipped',
+                'message' => 'Relay processing failed.',
+                'blocked_reason' => 'internal_error',
+                'key' => $key,
+                'error' => $e->getMessage(),
+            ];
         }
     }
-}
 
-            PBSR_Logger::write($source, $key, $data, $crm_status, $crm_resp, $books_status, $books_resp, 0);
-
-            return ['ok' => true, 'key' => $key, 'crm_status' => $crm_status, 'books_status' => $books_status];
-
-        } catch (Exception $e) {
-
-            PBSR_Logger::write($source, $key, $data, $crm_status, $crm_resp, 'error', $e->getMessage(), 0);
-
-            return ['ok' => false, 'key' => $key, 'error' => $e->getMessage()];
-
+    private static function flattenPayload(array $raw) {
+        if (isset($raw['contact']) && is_array($raw['contact'])) {
+            foreach ($raw['contact'] as $key => $value) {
+                if (!isset($raw[$key]) || $raw[$key] === '') {
+                    $raw[$key] = $value;
+                }
+            }
         }
 
+        if (isset($raw['shipping']) && is_array($raw['shipping'])) {
+            foreach ($raw['shipping'] as $key => $value) {
+                if (!isset($raw[$key]) || $raw[$key] === '') {
+                    $raw[$key] = $value;
+                }
+            }
+        }
+
+        return $raw;
     }
 
-}
+    private static function resolveBlends(array $raw, array $map) {
+        $blends = $raw[$map['blends']] ?? $raw['blends'] ?? $raw['sample_names'] ?? [];
 
+        if (is_string($blends)) {
+            $blends = array_filter(array_map('trim', preg_split('/[,;\n]+/', $blends)));
+        }
+
+        return array_values(array_filter((array) $blends));
+    }
+
+    private static function buildLogPayload(array $raw, array $data) {
+        $raw['context'] = PBSR_Attribution::enrichContext($raw['context'] ?? []);
+        $raw['blends'] = $data['blends'] ?? [];
+        $raw['email'] = $data['email'] ?? ($raw['email'] ?? '');
+        $raw['field_values'] = $data['field_values'] ?? ($raw['field_values'] ?? []);
+        $raw['extra_field_display'] = $data['extra_field_display'] ?? [];
+
+        return $raw;
+    }
+
+    private static function repeatLimitMessage($days) {
+        $site_url = home_url('/');
+
+        return sprintf(
+            'We limit sample requests to one delivery per household every %d days. If you need help, please contact us via %s.',
+            (int) $days,
+            $site_url
+        );
+    }
+}

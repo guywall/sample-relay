@@ -1,0 +1,665 @@
+<?php
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+class PBSR_Product_Selection_Form {
+    const AJAX_ACTION = 'pb_submit_samples';
+
+    public static function init() {
+        add_action('init', [__CLASS__, 'register_hooks'], 999);
+        add_action('wp_enqueue_scripts', [__CLASS__, 'enqueue_assets']);
+    }
+
+    public static function register_hooks() {
+        remove_shortcode('product_selection_form');
+        remove_shortcode('permabound_sample_request');
+
+        add_shortcode('product_selection_form', [__CLASS__, 'render_shortcode']);
+        add_shortcode('permabound_sample_request', [__CLASS__, 'render_shortcode']);
+
+        add_action('wp_ajax_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
+        add_action('wp_ajax_nopriv_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
+    }
+
+    public static function render_shortcode($atts) {
+        $atts = shortcode_atts([
+            'categories' => 'resin-bound-stone-blends,rubber-mulch,soft-gravel,colourbound',
+            'max' => 4,
+        ], $atts);
+
+        $nonce = wp_create_nonce('pbsamples_nonce');
+        $cats = array_filter(array_map('trim', explode(',', $atts['categories'])));
+        $max = (int) $atts['max'];
+        $auto_check = is_singular('product') ? get_the_title(get_the_ID()) : '';
+
+        ob_start();
+        ?>
+        <form id="pb-samples-form" class="pb-form" novalidate>
+            <input type="hidden" name="action" value="pb_submit_samples">
+            <input type="hidden" name="pbsamples_nonce" value="<?php echo esc_attr($nonce); ?>">
+            <input type="hidden" id="pb-max" value="<?php echo esc_attr($max); ?>">
+            <input type="hidden" name="max" value="<?php echo esc_attr($max); ?>">
+            <input type="text" name="website" class="hp" autocomplete="off" tabindex="-1" aria-hidden="true" style="position:absolute;left:-9999px;">
+            <input type="hidden" name="page_url" value="">
+            <input type="hidden" name="referrer" value="">
+            <input type="hidden" name="current_product" value="<?php echo esc_attr($auto_check); ?>">
+            <input type="hidden" name="pbsr_enable" value="1">
+
+            <section class="pb-step" data-step="1">
+                <h3>Select up to <span id="pb-max-count"><?php echo esc_html($max); ?></span> samples</h3>
+                <p class="pb-intro">Choose up to four blends you&rsquo;d like to receive as samples. Once you&rsquo;ve made your selections, click &lsquo;Next&rsquo; to enter your delivery details.</p>
+
+                <div id="pb-sticky-bar" class="pb-sticky-bar">
+                    <div class="pb-sticky-inner">
+                        <div id="pb-picked-top" class="pb-picked-top" aria-live="polite"></div>
+                        <div class="pb-sticky-meta">
+                            <div id="pb-step-indicator" class="pb-step-indicator">0/<?php echo esc_html($max); ?> selected</div>
+                            <button type="button" class="button button-primary pb-next-top" data-next>Next</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="pb-filter">
+                    <input type="search" id="pb-search" placeholder="Search products...">
+                    <?php
+                    $types = get_terms(['taxonomy' => 'product_type', 'hide_empty' => false]);
+                    if (!is_wp_error($types) && $types) {
+                        echo '<select id="pb-type"><option value="">All types</option>';
+                        foreach ($types as $type) {
+                            echo '<option value="' . esc_attr($type->slug) . '">' . esc_html($type->name) . '</option>';
+                        }
+                        echo '</select>';
+                    }
+                    ?>
+                </div>
+
+                <?php
+                $settings = PBSR_Settings::get();
+                $hidden = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
+
+                foreach ($cats as $slug) {
+                    $term = get_term_by('slug', $slug, 'product_category');
+                    if (!$term || is_wp_error($term)) {
+                        continue;
+                    }
+
+                    $query = new WP_Query([
+                        'post_type' => ['product', 'products'],
+                        'posts_per_page' => -1,
+                        'orderby' => 'title',
+                        'order' => 'ASC',
+                        'tax_query' => [[
+                            'taxonomy' => 'product_category',
+                            'field' => 'slug',
+                            'terms' => $slug,
+                        ]],
+                        'fields' => 'ids',
+                    ]);
+
+                    if (!$query->have_posts()) {
+                        continue;
+                    }
+
+                    $open = $slug === 'resin-bound-stone-blends' ? ' open' : '';
+                    echo '<details class="pb-accordion"' . $open . '>';
+                    echo '<summary class="pb-cat-title" data-cat="' . esc_attr($slug) . '">' . esc_html($term->name) . '</summary>';
+                    echo '<div class="pb-grid pb-products" data-cat="' . esc_attr($slug) . '">';
+
+                    foreach ($query->posts as $product_id) {
+                        if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
+                            continue;
+                        }
+
+                        $name = get_the_title($product_id);
+                        $thumb = get_the_post_thumbnail_url($product_id, 'medium_large');
+                        $sku = self::get_product_sku($product_id);
+
+                        if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
+                            continue;
+                        }
+
+                        $ptype = wp_get_post_terms($product_id, 'product_type', ['fields' => 'slugs']);
+                        $ptype_class = (!is_wp_error($ptype) && $ptype) ? implode(' ', $ptype) : '';
+                        $checked = ($auto_check && $auto_check === $name) ? 'checked' : '';
+                        ?>
+                        <label class="pb-card <?php echo esc_attr($ptype_class); ?>">
+                            <input
+                                type="checkbox"
+                                class="pb-choice"
+                                name="product_selection[]"
+                                value="<?php echo esc_attr($name); ?>"
+                                data-name="<?php echo esc_attr($name); ?>"
+                                data-sku="<?php echo esc_attr($sku); ?>"
+                                data-thumb="<?php echo esc_url($thumb ?: ''); ?>"
+                                <?php echo $checked; ?>
+                            >
+                            <?php if ($thumb): ?>
+                                <img src="<?php echo esc_url($thumb); ?>" alt="<?php echo esc_attr($name); ?>">
+                            <?php endif; ?>
+                            <span class="pb-name"><?php echo esc_html($name); ?></span>
+                        </label>
+                        <?php
+                    }
+
+                    echo '</div></details>';
+                    wp_reset_postdata();
+                }
+                ?>
+            </section>
+
+            <section class="pb-step" data-step="2" hidden>
+                <h3>Your details</h3>
+                <div class="pb-error-banner" role="alert" aria-live="polite"></div>
+                <div class="pb-form-fields">
+                    <?php echo PBSR_Form_Fields::renderFields(); ?>
+                </div>
+                <div class="pb-nav">
+                    <button type="button" class="button" data-prev>Previous</button>
+                    <button type="button" class="button button-primary" data-next>Next</button>
+                </div>
+            </section>
+
+            <section class="pb-step" data-step="3" hidden>
+                <h3>Review and submit</h3>
+                <div id="pb-review" class="pb-review"></div>
+                <div id="pb-review-grid" class="pb-review-grid" aria-live="polite"></div>
+                <div id="pb-status" class="pb-status" aria-live="polite"></div>
+                <div class="pb-nav">
+                    <button type="button" class="button" data-prev>Previous</button>
+                    <button type="button" class="button button-primary" id="pb-submit">Submit</button>
+                    <button type="button" class="button" id="pb-finish" hidden>Close</button>
+                </div>
+            </section>
+        </form>
+        <?php
+
+        return ob_get_clean();
+    }
+
+    public static function enqueue_assets() {
+        $css = <<<'CSS'
+.pb-step[hidden]{display:none!important}
+#pb-samples-form .pb-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+#pb-samples-form .pb-card{border:1px solid #ccc;padding:12px}
+#pb-samples-form .pb-card img{width:100%;height:auto}
+#pb-samples-form .pb-card.is-selected{outline:2px solid #ff9f23}
+#pb-samples-form .pb-nav{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+#pb-samples-form .pb-review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+#pb-samples-form .pb-review-tile{aspect-ratio:1/1;position:relative;overflow:hidden}
+#pb-samples-form .pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+#pb-samples-form .pb-form-fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+#pb-samples-form .pb-field{display:flex;flex-direction:column;gap:6px}
+#pb-samples-form .pb-field--checkbox{grid-column:1/-1}
+#pb-samples-form .pb-choice-inline,#pb-samples-form .pb-checkbox-label{display:block;margin:4px 0}
+#pb-samples-form .pb-help{color:#50575e}
+.pb-status .ok{color:#166534}
+.pb-status .warn{color:#9a3412}
+.pb-status .err{color:#991b1b}
+@media(max-width:1024px){#pb-samples-form .pb-products{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
+@media(max-width:768px){#pb-samples-form .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))!important}#pb-samples-form .pb-form-fields{grid-template-columns:1fr}}
+@media(max-width:640px){#pb-samples-form .pb-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+CSS;
+        wp_register_style('pb-samples', false);
+        wp_add_inline_style('pb-samples', $css);
+        wp_enqueue_style('pb-samples');
+
+        wp_register_script('pb-samples-js', '', [], PBSR_VER, true);
+        wp_enqueue_script('pb-samples-js');
+        wp_localize_script('pb-samples-js', 'PBSAMPLES', [
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'field_defs' => PBSR_Form_Fields::definitionsForJs(),
+        ]);
+
+        $js = <<<'JS'
+(function(){
+    function esc(s){
+        var str = String(s || "");
+        var map = {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"};
+        return str.replace(/[&<>"]/g, function(ch){ return map[ch]; });
+    }
+
+    function tracking(){
+        try {
+            return window.PBSRAttribution && window.PBSRAttribution.read ? window.PBSRAttribution.read() : {};
+        } catch (e) {
+            return {};
+        }
+    }
+
+    function getDefs(){
+        return Array.isArray(PBSAMPLES.field_defs) ? PBSAMPLES.field_defs : [];
+    }
+
+    function findDef(key){
+        return getDefs().find(function(def){ return def.key === key; }) || null;
+    }
+
+    function optionLabel(def, value){
+        if (!def || !Array.isArray(def.options)) {
+            return value;
+        }
+        var match = def.options.find(function(opt){ return opt.value === value; });
+        return match ? match.label : value;
+    }
+
+    function formValue(form, key){
+        var els = form.querySelectorAll('[name="' + key + '"]');
+        if (!els.length) {
+            return '';
+        }
+
+        var first = els[0];
+        if (first.type === 'radio') {
+            var checked = form.querySelector('[name="' + key + '"]:checked');
+            return checked ? checked.value : '';
+        }
+
+        if (first.type === 'checkbox') {
+            return first.checked ? '1' : '';
+        }
+
+        return first.value || '';
+    }
+
+    function conditionMatch(form, def){
+        if (!def || !def.condition_field || !def.condition_operator) {
+            return true;
+        }
+
+        var actual = formValue(form, def.condition_field);
+        if (def.condition_operator === 'equals') {
+            return actual === def.condition_value;
+        }
+        if (def.condition_operator === 'not_equals') {
+            return actual !== def.condition_value;
+        }
+        return true;
+    }
+
+    function scan(){
+        document.querySelectorAll("#pb-samples-form").forEach(initForm);
+    }
+
+    function initForm(form){
+        if (!form || form.dataset.pbInit) {
+            return;
+        }
+
+        form.dataset.pbInit = "1";
+        var steps = [].slice.call(form.querySelectorAll(".pb-step"));
+        var max = parseInt((form.querySelector("#pb-max") || {value:"4"}).value, 10) || 4;
+
+        function picks(){
+            return [].slice.call(form.querySelectorAll(".pb-choice:checked"));
+        }
+
+        function stepIndex(){
+            return steps.findIndex(function(step){ return !step.hidden; });
+        }
+
+        function show(index){
+            steps.forEach(function(step, idx){
+                step.hidden = idx !== index;
+            });
+            if (index === 2) {
+                buildReview();
+                renderGrid();
+            }
+        }
+
+        function setContext(){
+            var page = form.querySelector('input[name="page_url"]');
+            var ref = form.querySelector('input[name="referrer"]');
+            var attr = tracking();
+
+            if (page) {
+                page.value = window.location.href;
+            }
+            if (ref) {
+                ref.value = attr.referrer || document.referrer || "";
+            }
+        }
+
+        function update(){
+            var count = picks().length;
+            var indicator = form.querySelector("#pb-step-indicator");
+            if (indicator) {
+                indicator.textContent = count + "/" + max + " selected";
+            }
+            form.querySelectorAll(".pb-card").forEach(function(card){
+                var choice = card.querySelector(".pb-choice");
+                card.classList.toggle("is-selected", !!(choice && choice.checked));
+            });
+        }
+
+        function applyConditions(){
+            getDefs().forEach(function(def){
+                var wrapper = form.querySelector('[data-field-key="' + def.key + '"]');
+                if (!wrapper) {
+                    return;
+                }
+
+                var visible = conditionMatch(form, def);
+                wrapper.style.display = visible ? "" : "none";
+                wrapper.querySelectorAll('input,select,textarea').forEach(function(input){
+                    if (input.type === 'hidden') {
+                        return;
+                    }
+                    input.disabled = !visible;
+                });
+            });
+        }
+
+        function buildReview(){
+            var out = [];
+            var selectedProducts = picks().map(function(choice){ return choice.dataset.name || choice.value; });
+            out.push("<p><strong>Selected products:</strong> " + esc(selectedProducts.join(", ")) + "</p>");
+
+            getDefs().forEach(function(def){
+                if (def.hidden || !conditionMatch(form, def)) {
+                    return;
+                }
+                var value = formValue(form, def.key);
+                if (!value) {
+                    return;
+                }
+                if (def.type === 'checkbox') {
+                    value = 'Yes';
+                } else {
+                    value = optionLabel(def, value);
+                }
+                out.push("<p><strong>" + esc(def.label) + ":</strong> " + esc(value) + "</p>");
+            });
+
+            var review = form.querySelector("#pb-review");
+            if (review) {
+                review.innerHTML = out.join("");
+            }
+        }
+
+        function renderGrid(){
+            var grid = form.querySelector("#pb-review-grid");
+            if (!grid) {
+                return;
+            }
+
+            var items = picks().map(function(choice){
+                return {
+                    name: choice.dataset.name || choice.value,
+                    thumb: choice.dataset.thumb || ""
+                };
+            });
+
+            if (!items.length) {
+                grid.innerHTML = "";
+                return;
+            }
+
+            grid.innerHTML = items.map(function(item){
+                return "<div class=\"pb-review-tile\">" + (item.thumb ? "<img src=\"" + esc(item.thumb) + "\" alt=\"" + esc(item.name) + "\">" : "") + "</div>";
+            }).join("");
+        }
+
+        form.addEventListener("input", function(e){
+            if (e.target && e.target.id === "pb-search") {
+                var query = (e.target.value || "").toLowerCase();
+                form.querySelectorAll(".pb-card").forEach(function(card){
+                    var name = ((card.querySelector(".pb-name") || {}).textContent || "").toLowerCase();
+                    card.style.display = (!query || name.indexOf(query) !== -1) ? "" : "none";
+                });
+            }
+
+            if (e.target && e.target.name) {
+                applyConditions();
+            }
+        });
+
+        form.addEventListener("change", function(e){
+            if (e.target && e.target.classList.contains("pb-choice")) {
+                if (picks().length > max) {
+                    e.target.checked = false;
+                    alert("You can select a maximum of " + max + " samples.");
+                }
+                update();
+            }
+
+            if (e.target && e.target.name) {
+                applyConditions();
+            }
+        });
+
+        form.addEventListener("click", function(e){
+            var next = e.target.closest("[data-next]");
+            if (next) {
+                var current = stepIndex();
+                if (current === 0 && picks().length === 0) {
+                    alert("Please select at least one sample.");
+                    return;
+                }
+                if (current === 1 && !form.checkValidity()) {
+                    form.reportValidity();
+                    return;
+                }
+                show(Math.min(current + 1, 2));
+                return;
+            }
+
+            var prev = e.target.closest("[data-prev]");
+            if (prev) {
+                show(Math.max(stepIndex() - 1, 0));
+                return;
+            }
+
+            var submit = e.target.closest("#pb-submit");
+            if (submit) {
+                var status = form.querySelector("#pb-status");
+                var finish = form.querySelector("#pb-finish");
+
+                setContext();
+                var fd = new FormData(form);
+                submit.disabled = true;
+
+                if (status) {
+                    status.innerHTML = "<p>Submitting...</p>";
+                }
+
+                picks().forEach(function(choice){
+                    fd.append("product_names[]", choice.dataset.name || choice.value);
+                    fd.append("product_skus[]", choice.dataset.sku || "");
+                });
+
+                fetch(PBSAMPLES.ajax_url, {
+                    method: "POST",
+                    body: fd,
+                    headers: {"X-Requested-With":"XMLHttpRequest"}
+                })
+                .then(function(response){ return response.json(); })
+                .then(function(response){
+                    var relay = response && response.data && response.data.relay ? response.data.relay : null;
+                    if (!response || !response.success || !relay) {
+                        if (status) {
+                            status.innerHTML = "<p class=\"err\">" + ((response && response.data && response.data.message) || "Submission failed") + "</p>";
+                        }
+                        submit.disabled = false;
+                        return;
+                    }
+
+                    if (relay.status === "accepted" || relay.status === "duplicate") {
+                        if (status) {
+                            status.innerHTML = "<p class=\"ok\">" + esc(relay.message || "Submission successful") + "</p>";
+                        }
+                        if (finish) {
+                            finish.hidden = false;
+                        }
+                        return;
+                    }
+
+                    if (relay.status === "blocked") {
+                        if (status) {
+                            status.innerHTML = "<p class=\"warn\">" + esc(relay.message || "This request cannot be submitted right now.") + "</p>";
+                        }
+                        if (finish) {
+                            finish.hidden = false;
+                        }
+                        return;
+                    }
+
+                    if (status) {
+                        status.innerHTML = "<p class=\"err\">" + esc(relay.message || "Submission failed") + "</p>";
+                    }
+                    submit.disabled = false;
+                })
+                .catch(function(){
+                    if (status) {
+                        status.innerHTML = "<p class=\"err\">Submission failed</p>";
+                    }
+                    submit.disabled = false;
+                });
+                return;
+            }
+
+            var finish = e.target.closest("#pb-finish");
+            if (finish && window.elementorProFrontend && elementorProFrontend.modules && elementorProFrontend.modules.popup) {
+                try {
+                    elementorProFrontend.modules.popup.closePopup();
+                } catch (ex) {}
+            }
+        });
+
+        setContext();
+        applyConditions();
+        update();
+        show(0);
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", scan);
+    } else {
+        scan();
+    }
+
+    if (window.jQuery) {
+        jQuery(document).on("elementor/popup/show", scan);
+    }
+})();
+JS;
+
+        wp_add_inline_script('pb-samples-js', $js);
+    }
+
+    public static function handle_submission() {
+        if (!empty($_POST['website'])) {
+            wp_send_json_error(['message' => 'Spam blocked.']);
+        }
+
+        if (!isset($_POST['pbsamples_nonce']) || !wp_verify_nonce(sanitize_text_field(wp_unslash($_POST['pbsamples_nonce'])), 'pbsamples_nonce')) {
+            wp_send_json_error(['message' => 'Invalid nonce.']);
+        }
+
+        $submission = PBSR_Form_Fields::collectSubmission($_POST);
+        if (!empty($submission['errors'])) {
+            wp_send_json_error(['message' => reset($submission['errors'])]);
+        }
+
+        $values = $submission['values'];
+        $page_url = esc_url_raw(wp_unslash($_POST['page_url'] ?? ''));
+        $referrer = esc_url_raw(wp_unslash($_POST['referrer'] ?? ''));
+        $current_product = sanitize_text_field(wp_unslash($_POST['current_product'] ?? ''));
+
+        $product_names = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_names'] ?? ($_POST['product_selection'] ?? [])));
+        $product_skus = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_skus'] ?? []));
+
+        $max = (int) ($_POST['max'] ?? 4);
+        if ($max < 1) {
+            $max = 4;
+        }
+
+        $product_names = array_values(array_slice(array_unique($product_names), 0, $max));
+        if (empty($product_names)) {
+            wp_send_json_error(['message' => 'Please select at least one sample.']);
+        }
+
+        $aligned_skus = [];
+        foreach ($product_names as $i => $name) {
+            $aligned_skus[$i] = $product_skus[$i] ?? '';
+        }
+
+        $samples = [];
+        foreach ($product_names as $i => $name) {
+            $samples[] = [
+                'name' => $name,
+                'sku' => $aligned_skus[$i] ?? '',
+            ];
+        }
+
+        $raw = $values;
+        $raw['source'] = 'permabound_sample_request';
+        $raw['contact'] = [
+            'first_name' => $values['first_name'] ?? '',
+            'last_name' => $values['last_name'] ?? '',
+            'email' => $values['email'] ?? '',
+            'phone' => $values['phone'] ?? '',
+            'enquiry_type' => $values['enquiry_type'] ?? '',
+            'organisation_name' => $values['organisation_name'] ?? '',
+            'gdpr_consent' => !empty($values['gdpr_consent']),
+        ];
+        $raw['shipping'] = [
+            'street' => $values['street'] ?? '',
+            'address_2' => $values['address_2'] ?? '',
+            'city' => $values['city'] ?? '',
+            'county' => $values['county'] ?? '',
+            'country' => $values['country'] ?? '',
+            'postcode' => $values['postcode'] ?? '',
+        ];
+        $raw['samples'] = $samples;
+        $raw['sample_names'] = $product_names;
+        $raw['field_values'] = $values;
+        $raw['field_display_values'] = $submission['display'];
+        $raw['context'] = [
+            'page_url' => $page_url,
+            'referrer' => $referrer,
+            'current_product' => $current_product,
+            'user_agent' => isset($_SERVER['HTTP_USER_AGENT']) ? sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT'])) : '',
+        ];
+
+        $idem = md5(wp_json_encode(['pb_submit_samples', $values['email'] ?? '', $samples, date('Y-m-d-H')]));
+        $res = PBSR_Dispatcher::process($raw, 'permabound_sample_request', $idem);
+
+        if (!empty($res['ok']) || ($res['status'] ?? '') === 'blocked') {
+            wp_send_json_success([
+                'ok' => !empty($res['ok']),
+                'relay' => $res,
+            ]);
+        }
+
+        wp_send_json_error([
+            'message' => $res['message'] ?? 'Relay processing failed.',
+            'relay' => $res,
+        ]);
+    }
+
+    private static function get_product_sku($product_id) {
+        $preferred_keys = ['sample_sku', 'sku', '_sku', 'product_sku'];
+
+        foreach ($preferred_keys as $key) {
+            $value = trim((string) get_post_meta($product_id, $key, true));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        if (function_exists('get_field')) {
+            foreach ($preferred_keys as $key) {
+                $value = trim((string) get_field($key, $product_id));
+                if ($value !== '') {
+                    return $value;
+                }
+            }
+        }
+
+        return '';
+    }
+}
+
+PBSR_Product_Selection_Form::init();
