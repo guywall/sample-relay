@@ -178,7 +178,7 @@ class PBSR_Product_Selection_Form {
                     </div>
                 </div>
 
-                <div class="pb-grid">
+                <div class="pb-grid pb-project-grid">
                     <div class="pb-field">
                         <label for="pb-enquiry">Enquiry type</label>
                         <select id="pb-enquiry" name="enquiry_type" required>
@@ -282,27 +282,119 @@ class PBSR_Product_Selection_Form {
 
     public static function enqueue_assets() {
         $css = <<<'CSS'
+.pb-no-postcode{margin-top:4px;color:#555}
+.pb-no-postcode input[type="checkbox"]{accent-color:var(--pb-brand,#ff9f23)}
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;700&display=swap");
+#pb-samples-form{
+    --pb-brand:#ff9f23;
+    --pb-brand-700:#e68f20;
+    --pb-ring:rgba(255,159,35,.28);
+    --pb-border:#cfd3da;
+    --pb-border-soft:#e5e7eb;
+    --pb-error:#c62828;
+    --pb-error-bg:#fff0f0;
+    --pb-error-ring:rgba(198,40,40,.18);
+    --pb-shadow:0 6px 20px rgba(0,0,0,.08);
+    font-family:"Montserrat",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+    font-size:1em;
+    font-weight:400;
+}
+#pb-samples-form *{box-sizing:border-box}
+.pb-form{max-width:880px;margin:0 auto;color:#4e4e4e}
+.pb-step{background:#fff;animation:pbFadeIn .2s ease both}
+@keyframes pbFadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.pb-step>h3{font-size:2em;font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin:0 0 .25em 0}
+.pb-intro{margin:-.25em 0 1em 0;color:#4e4e4e}
+.pb-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;row-gap:20px}
+.pb-field{margin-bottom:8px}
+.pb-field label{display:block;margin-bottom:6px;font-weight:700}
+.pb-field input,.pb-field select,fieldset.pb-address input,.pb-filter input,.pb-filter select{
+    width:100%;
+    padding:10px;
+    border:1px solid var(--pb-border)!important;
+    border-radius:10px;
+    background:#fff!important;
+    box-shadow:inset 0 1px 2px rgba(0,0,0,.02);
+    transition:border-color .15s,box-shadow .15s;
+}
+.pb-field input:focus,.pb-field select:focus,fieldset.pb-address input:focus,.pb-filter input:focus,.pb-filter select:focus{
+    border-color:var(--pb-brand)!important;
+    box-shadow:0 0 0 3px var(--pb-ring)!important;
+    outline:0;
+}
+fieldset.pb-address{border:1px solid var(--pb-border-soft);padding:16px;border-radius:12px;margin-top:18px}
+fieldset.pb-address legend{padding:0 6px;color:#4e4e4e;font-weight:700}
+.pb-error-banner{display:none;padding:10px 12px;border:1px solid var(--pb-error);background:var(--pb-error-bg);color:#7f1d1d;border-radius:10px;margin:6px 0 12px}
+.pb-error-banner.show{display:block}
+.is-invalid{border-color:var(--pb-error)!important;box-shadow:0 0 0 3px var(--pb-error-ring)!important;background:#fff7f7!important}
+input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offset:3px}
+.pb-nav{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
+.pb-form .button{border-radius:10px;padding:10px 14px;border:1px solid var(--pb-border);background:#fafbfc;transition:transform .05s,background .15s}
+.pb-form .button:hover{background:#f3f4f6}
+.pb-form .button:active{transform:scale(.99)}
+.pb-form .button.button-primary{background:var(--pb-brand)!important;border-color:var(--pb-brand)!important;color:#111!important;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.06)}
+.pb-form .button.button-primary:hover{background:var(--pb-brand-700)!important;border-color:var(--pb-brand-700)!important}
+.pb-form input[type="checkbox"]{accent-color:var(--pb-brand)}
+.pb-products{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:20px}
+.pb-card{display:flex;flex-direction:column;align-items:center;gap:8px;border:1px solid var(--pb-border-soft);border-radius:14px;padding:12px;cursor:pointer;position:relative;transition:border-color .15s,box-shadow .15s,transform .05s,background .15s;background:#fff;text-align:center}
+.pb-card input{position:absolute;opacity:0;pointer-events:none}
+.pb-card img{width:120px;height:auto;border-radius:10px}
+.pb-card:hover{box-shadow:0 1px 0 0 rgba(0,0,0,.06)}
+.pb-card:active{transform:scale(.99)}
+.pb-card.is-selected{border-color:var(--pb-brand);box-shadow:0 0 0 2px var(--pb-ring)}
+.pb-card.is-selected .pb-name{font-weight:700}
+.pb-card.is-selected::after{content:"\2713";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--pb-brand);color:#4e4e4e;font-weight:800;font-size:14px;line-height:1}
+.pb-cat-title{margin:8px 0;font-size:1.1rem;list-style:none}
+.pb-accordion{border-top:1px solid var(--pb-border-soft);padding:8px 0}
+.pb-accordion summary{cursor:pointer;padding:8px 0;font-weight:800;display:flex;align-items:center;gap:8px;transition:color .15s}
+.pb-accordion summary::marker,.pb-accordion summary::-webkit-details-marker{display:none}
+.pb-accordion summary:before{content:"\25b8";display:inline-block;transform:rotate(0deg);transition:transform .15s}
+.pb-accordion[open] summary:before{transform:rotate(90deg)}
+.pb-accordion[open] summary{color:var(--pb-brand)}
+.pb-accordion>.pb-products{animation:pbAccordion .18s ease both}
+@keyframes pbAccordion{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.pb-filter{display:flex;gap:10px;margin:10px 0}
+.pb-chip{padding:6px 14px 6px 10px;border:1px solid var(--pb-border-soft);border-radius:9999px;background:#f6f7f8;font-size:1rem;display:inline-flex;align-items:center;gap:10px;transition:background .15s,border-color .15s;line-height:1}
+.pb-chip img{width:34px;height:34px;flex:0 0 34px;aspect-ratio:1/1;border-radius:50%!important;object-fit:cover;display:block;border:1px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,.05)}
+.pb-chip .remove{border:none;background:none;cursor:pointer;margin-left:2px;font-weight:700;line-height:1;color:#c2185b}
+.pb-chip:hover{background:#eef0f2;border-color:#d7dbe2}
+#pb-sticky-bar{position:sticky;top:0;z-index:40;background:#fff;border-bottom:1px solid var(--pb-border-soft);padding:10px 0 8px;transition:box-shadow .2s}
+#pb-sticky-bar.pb-shadow{box-shadow:var(--pb-shadow)}
+.pb-sticky-inner{display:flex;flex-direction:column;gap:8px}
+.pb-picked-top{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:2px}
+.pb-sticky-meta{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.pb-step-indicator{font-weight:800;font-size:.95rem}
+.pb-next-top{padding:6px 14px;font-weight:700;border-radius:8px}
+.pb-review-grid{margin:14px 0 4px 0;display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.pb-review-tile{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--pb-border-soft);background:#fafafa;box-shadow:inset 0 1px 2px rgba(0,0,0,.02);aspect-ratio:1/1;display:flex;align-items:flex-end;justify-content:flex-start}
+.pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.pb-review-name{position:relative;color:#fff;font-weight:800;font-size:.95rem;padding:8px;z-index:1;letter-spacing:.01em}
 .pb-step[hidden]{display:none!important}
-#pb-samples-form .pb-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
-#pb-samples-form .pb-card{border:1px solid #ccc;padding:12px}
-#pb-samples-form .pb-card img{width:100%;height:auto}
-#pb-samples-form .pb-card.is-selected{outline:2px solid #ff9f23}
-#pb-samples-form .pb-nav{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-#pb-samples-form .pb-review-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
-#pb-samples-form .pb-review-tile{aspect-ratio:1/1;position:relative;overflow:hidden}
-#pb-samples-form .pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-#pb-samples-form .pb-project-type{margin:0;padding:0;border:0;min-inline-size:0}
-#pb-samples-form .pb-project-type legend{margin:0 0 6px;padding:0;font-weight:600}
-#pb-samples-form .pb-check-group{display:grid;gap:10px}
-#pb-samples-form .pb-check-option{display:flex!important;align-items:center!important;justify-content:flex-start!important;gap:10px;width:100%;margin:0;cursor:pointer;text-align:left}
-#pb-samples-form .pb-check-option input[type="checkbox"]{width:auto!important;min-width:16px;max-width:16px;height:16px;margin:0!important;flex:0 0 16px}
-#pb-samples-form .pb-check-option span{display:block;flex:1 1 auto}
-.pb-status .ok{color:#166534}
+.pb-status .ok{color:#4e4e4e}
 .pb-status .warn{color:#9a3412}
-.pb-status .err{color:#991b1b}
-@media(max-width:1024px){#pb-samples-form .pb-products{grid-template-columns:repeat(3,minmax(0,1fr))!important}}
-@media(max-width:768px){#pb-samples-form .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))!important}}
-@media(max-width:640px){#pb-samples-form .pb-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.pb-status .err{color:#9f2f2f}
+.hp{display:none!important}
+.pb-review p{margin:.3rem 0}
+#pb-samples-form .pb-project-grid{align-items:start}
+#pb-samples-form .pb-project-type{margin:0;padding:0;border:0;min-inline-size:0}
+#pb-samples-form .pb-project-type legend{margin:0 0 6px;padding:0;font-weight:700;color:#4e4e4e}
+#pb-samples-form .pb-check-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+#pb-samples-form .pb-check-option{display:flex!important;align-items:center!important;gap:10px;padding:10px 12px;margin:0;border:1px solid var(--pb-border)!important;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
+#pb-samples-form .pb-check-option.is-selected{border-color:var(--pb-brand)!important;box-shadow:0 0 0 3px var(--pb-ring)!important;background:#fffaf3}
+#pb-samples-form .pb-check-option:hover{border-color:var(--pb-brand)!important}
+#pb-samples-form .pb-check-option input[type="checkbox"]{width:auto!important;min-width:16px;max-width:16px;height:16px;margin:0!important;flex:0 0 16px}
+#pb-samples-form .pb-check-option span{display:block;flex:1 1 auto;font-weight:700}
+#pb-samples-form .pb-consent{margin-top:18px}
+@media (max-width:640px){
+    .pb-grid{grid-template-columns:1fr}
+    .pb-filter{flex-direction:column}
+    .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .pb-review-grid{grid-template-columns:repeat(2,1fr)}
+    .pb-sticky-inner{gap:6px}
+    .pb-sticky-meta{flex-direction:column;align-items:flex-start}
+    .pb-next-top{align-self:flex-end}
+    #pb-samples-form .pb-check-group{grid-template-columns:1fr}
+}
 CSS;
         wp_register_style('pb-samples', false);
         wp_add_inline_style('pb-samples', $css);
@@ -312,308 +404,672 @@ CSS;
         wp_enqueue_script('pb-samples-js');
         wp_localize_script('pb-samples-js', 'PBSAMPLES', ['ajax_url' => admin_url('admin-ajax.php')]);
 
-        $js = <<<'JS'
-(function(){
-    function esc(s){
-        var str = String(s || "");
-        var map = {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"};
-        return str.replace(/[&<>"]/g, function(ch){ return map[ch]; });
-    }
-
-    function tracking(){
-        try {
-            return window.PBSRAttribution && window.PBSRAttribution.read ? window.PBSRAttribution.read() : {};
-        } catch (e) {
-            return {};
+    $js = '
+    (function(){
+        // --- Utilities ---
+        function esc(s){
+            var str = String(s||"");
+            var map = {"&":"&amp;","<":"&lt;",">":"&gt;","\\"":"&quot;"};
+            return str.replace(/[&<>"]/g,function(ch){return map[ch];}).replace(/\\x27/g,"&#39;");
         }
-    }
-
-    function scan(){
-        document.querySelectorAll("#pb-samples-form").forEach(initForm);
-    }
-
-    function initForm(form){
-        if (!form || form.dataset.pbInit) {
-            return;
+        function steps(form){ return form.querySelectorAll(".pb-step"); }
+        function currentStepIndex(form){
+            var ss = steps(form);
+            for (var i=0;i<ss.length;i++){ if(!ss[i].hasAttribute("hidden")) return i; }
+            return 0;
+        }
+        function showStep(form, i){
+            var ss = steps(form);
+            for (var k=0;k<ss.length;k++){ ss[k].hidden = (k!==i); }
+            if (i===2){ buildReview(form); renderReviewGrid(form); }
+            try{ window.scrollTo({top: form.getBoundingClientRect().top + window.scrollY - 40, behavior:"smooth"});}catch(e){}
         }
 
-        form.dataset.pbInit = "1";
-        var steps = [].slice.call(form.querySelectorAll(".pb-step"));
-        var max = parseInt((form.querySelector("#pb-max") || {value:"4"}).value, 10) || 4;
-
-        function picks(){
-            return [].slice.call(form.querySelectorAll(".pb-choice:checked"));
-        }
-
-        function stepIndex(){
-            return steps.findIndex(function(step){ return !step.hidden; });
-        }
-
-        function show(index){
-            steps.forEach(function(step, stepIndex){
-                step.hidden = stepIndex !== index;
-            });
-
-            if (index === 2) {
-                buildReview();
-                renderGrid();
+        // Maintain a hidden bar for internal mapping (not shown)
+        function ensurePickedBar(form){
+            var bar = form.querySelector(".pb-picked");
+            if (!bar){
+                var after = form.querySelector(".pb-count");
+                bar = document.createElement("div");
+                bar.className = "pb-picked";
+                if (after && after.parentNode){
+                    after.parentNode.insertBefore(bar, after.nextSibling);
+                } else {
+                    var s1 = form.querySelector(\'[data-step="1"]\');
+                    if (s1) s1.appendChild(bar);
+                }
             }
+            return bar;
         }
 
-        function setContext(){
-            var page = form.querySelector('input[name="page_url"]');
-            var ref = form.querySelector('input[name="referrer"]');
+        function setContext(form){
+            var page = form.querySelector(\'input[name="page_url"]\');
+            var ref = form.querySelector(\'input[name="referrer"]\');
             var attr = tracking();
-
             if (page) {
                 page.value = window.location.href;
             }
-
             if (ref) {
                 ref.value = attr.referrer || document.referrer || "";
             }
         }
 
-        function update(){
-            var count = picks().length;
-            var indicator = form.querySelector("#pb-step-indicator");
-
-            if (indicator) {
-                indicator.textContent = count + "/" + max + " selected";
-            }
-
-            form.querySelectorAll(".pb-card").forEach(function(card){
-                var choice = card.querySelector(".pb-choice");
-                card.classList.toggle("is-selected", !!(choice && choice.checked));
-            });
-        }
-
-        function buildReview(){
-            var out = [];
-            var sels = picks().map(function(choice){ return choice.dataset.name || choice.value; });
-            function getValue(id){
-                var el = form.querySelector("#" + id);
-                return el && el.value ? el.value : "";
-            }
-            function getCheckedValues(name){
-                return [].slice.call(form.querySelectorAll('input[name="' + name + '"]:checked')).map(function(input){
-                    return input.value || "";
-                }).filter(Boolean);
-            }
-
-            var projectTypes = getCheckedValues("project_type[]");
-            var projectSize = getValue("pb-project-size");
-
-            out.push("<p><strong>Name:</strong> " + esc(getValue("pb-first")) + " " + esc(getValue("pb-last")) + "</p>");
-            out.push("<p><strong>Email:</strong> " + esc(getValue("pb-email")) + "</p>");
-            out.push("<p><strong>Phone:</strong> " + esc(getValue("pb-phone")) + "</p>");
-            if (projectTypes.length) {
-                out.push("<p><strong>Project type:</strong> " + esc(projectTypes.join(", ")) + "</p>");
-            }
-            if (projectSize) {
-                out.push("<p><strong>Project size:</strong> " + esc(projectSize) + " m&sup2;</p>");
-            }
-            out.push("<p><strong>Selected products:</strong> " + esc(sels.join(", ")) + "</p>");
-
-            var review = form.querySelector("#pb-review");
-            if (review) {
-                review.innerHTML = out.join("");
-            }
-        }
-
-        function syncProjectFields(){
-            var projectTypes = [].slice.call(form.querySelectorAll('input[name="project_type[]"]:checked')).map(function(input){
-                return input.value || "";
-            }).filter(Boolean);
+        function syncProjectFields(form){
+            var projectTypes = Array.prototype.map.call(
+                form.querySelectorAll(\'input[name="project_type[]"]:checked\'),
+                function(input){ return input.value || ""; }
+            ).filter(Boolean);
             var projectSize = (form.querySelector("#pb-project-size") || {}).value || "";
-            var projectTypeHidden = form.querySelector('input[name="project_type_serialized"]');
-            var projectSizeHidden = form.querySelector('input[name="project_size_value"]');
+            var projectTypeHidden = form.querySelector(\'input[name="project_type_serialized"]\');
+            var projectSizeHidden = form.querySelector(\'input[name="project_size_value"]\');
 
             if (projectTypeHidden) {
                 projectTypeHidden.value = projectTypes.join(", ");
             }
-
             if (projectSizeHidden) {
                 projectSizeHidden.value = projectSize;
             }
+
+            Array.prototype.forEach.call(form.querySelectorAll(".pb-check-option"), function(label){
+                var checkbox = label.querySelector(\'input[type="checkbox"]\');
+                label.classList.toggle("is-selected", !!(checkbox && checkbox.checked));
+            });
         }
 
-        function renderGrid(){
+        function updateSelectedVisual(form){
+            var cards = form.querySelectorAll(".pb-card");
+            for (var i=0;i<cards.length;i++){
+                var cb = cards[i].querySelector(".pb-choice");
+                if (cb && cb.checked){ cards[i].classList.add("is-selected"); }
+                else { cards[i].classList.remove("is-selected"); }
+            }
+            syncProjectFields(form);
+        }
+
+        // Bottom (hidden) chips list stays for internal state
+        function updateSelectedList(form){
+            var bar = ensurePickedBar(form);
+            var sels = Array.prototype.map.call(
+                form.querySelectorAll(".pb-choice:checked"),
+                function(c){
+                    return {
+                        name:c.getAttribute("data-name")||c.value,
+                        sku:c.getAttribute("data-sku")||"",
+                        thumb:c.getAttribute("data-thumb")||""
+                    };
+                }
+            );
+            if (!sels.length){ bar.innerHTML = ""; return; }
+            var html = sels.map(function(o){
+                var img = o.thumb ? \'<img src="\' + esc(o.thumb) + \'" alt="">\' : "";
+                return \'<span class="pb-chip" data-value="\' + esc(o.name) + \'">\' +
+                       img + esc(o.name) +
+                       \' <button type="button" class="remove" aria-label="Remove \' + esc(o.name) + \'">&times;</button></span>\';
+            }).join("");
+            bar.innerHTML = html;
+        }
+
+        function updateCount(form){
+            var countEl = form.querySelector("#pb-count");
+            var selected = form.querySelectorAll(".pb-choice:checked");
+            if (countEl) countEl.textContent = String(selected.length);
+        }
+        function selectedCount(form){ return form.querySelectorAll(".pb-choice:checked").length; }
+        function maxAllowed(form){
+            var maxEl = form.querySelector("#pb-max");
+            return parseInt(maxEl ? (maxEl.value||"4") : "4", 10);
+        }
+
+        function filterProducts(form){
+            var qEl = form.querySelector("#pb-search");
+            var tEl = form.querySelector("#pb-type");
+            var q = (qEl && qEl.value || "").toLowerCase();
+            var t = tEl ? tEl.value : "";
+            var cards = form.querySelectorAll(".pb-card");
+            for (var i=0;i<cards.length;i++){
+                var card = cards[i];
+                var nameEl = card.querySelector(".pb-name");
+                var name = nameEl ? nameEl.textContent.toLowerCase() : "";
+                var classes = card.className || "";
+                var ok = (!q || name.indexOf(q)!==-1) && (!t || classes.indexOf(t)!==-1);
+                card.style.display = ok ? "" : "none";
+            }
+            updateSelectedVisual(form);
+        }
+
+        // Review text summary (unchanged info but selections no longer comma-only)
+        function buildReview(form){
+            var out = [];
+            function get(id){ var el=form.querySelector("#"+id); return el && el.value ? el.value : ""; }
+            function getCheckedValues(name){
+                return Array.prototype.map.call(
+                    form.querySelectorAll(\'input[name="\' + name + \'"]:checked\'),
+                    function(input){ return input.value || ""; }
+                ).filter(Boolean);
+            }
+            var sels = Array.prototype.map.call(
+                form.querySelectorAll(".pb-choice:checked"),
+                function(c){ return c.getAttribute("data-name")||c.value; }
+            );
+            out.push("<p><strong>Name:</strong> " + esc(get("pb-first")) + " " + esc(get("pb-last")) + "</p>");
+            out.push("<p><strong>Email:</strong> " + esc(get("pb-email")) + "</p>");
+            out.push("<p><strong>Phone:</strong> " + esc(get("pb-phone")) + "</p>");
+            var enquEl = form.querySelector("#pb-enquiry");
+            var enquText = enquEl && enquEl.selectedOptions && enquEl.selectedOptions[0] ? enquEl.selectedOptions[0].textContent : (enquEl ? enquEl.value : "");
+            out.push("<p><strong>Enquiry type:</strong> " + esc(enquText) + "</p>");
+            var orgEl = form.querySelector("#pb-org");
+            if (orgEl && orgEl.value) out.push("<p><strong>Organisation:</strong> " + esc(orgEl.value) + "</p>");
+            var projectTypes = getCheckedValues("project_type[]");
+            if (projectTypes.length) out.push("<p><strong>Project type:</strong> " + esc(projectTypes.join(", ")) + "</p>");
+            if (get("pb-project-size")) out.push("<p><strong>Project size:</strong> " + esc(get("pb-project-size")) + " m&sup2;</p>");
+            out.push("<p><strong>Address:</strong> " + esc(get("pb-street")) + (get("pb-address2") ? ", " + esc(get("pb-address2")) : "") + ", " + esc(get("pb-city")) + ", " + esc(get("pb-county")) + ", " + esc(get("pb-country")) + " " + esc(get("pb-postcode")) + "</p>");
+            // Keep a simple list line as well
+            out.push("<p><strong>Selected products:</strong> " + esc(sels.join(", ")) + "</p>");
+            var review = form.querySelector("#pb-review");
+            if (review) review.innerHTML = out.join("");
+        }
+
+        // Review grid (4 cols desktop/tablet, 2 cols mobile)
+        function renderReviewGrid(form){
             var grid = form.querySelector("#pb-review-grid");
-            if (!grid) {
-                return;
-            }
-
-            var items = picks().map(function(choice){
-                return {
-                    name: choice.dataset.name || choice.value,
-                    thumb: choice.dataset.thumb || ""
-                };
-            });
-
-            if (!items.length) {
-                grid.innerHTML = "";
-                return;
-            }
-
-            grid.innerHTML = items.map(function(item){
-                return "<div class=\"pb-review-tile\">" + (item.thumb ? "<img src=\"" + esc(item.thumb) + "\" alt=\"" + esc(item.name) + "\">" : "") + "</div>";
+            if(!grid) return;
+            var items = Array.prototype.map.call(
+                form.querySelectorAll(".pb-choice:checked"),
+                function(c){
+                    return {
+                        name: c.getAttribute("data-name")||c.value,
+                        thumb: c.getAttribute("data-thumb")||""
+                    };
+                }
+            );
+            if(!items.length){ grid.innerHTML = ""; return; }
+            grid.innerHTML = items.map(function(it){
+                var img = it.thumb ? \'<img src="\' + esc(it.thumb) + \'" alt="\' + esc(it.name) + \'">\'
+                                   : \'<div style="position:absolute;inset:0;background:#eee"></div>\';
+                return \'<div class="pb-review-tile">\' + img + \'<div class="pb-review-name">\' + esc(it.name) + \'</div></div>\';
             }).join("");
         }
 
-        form.addEventListener("input", function(e){
-            if (e.target && e.target.id === "pb-search") {
-                var query = (e.target.value || "").toLowerCase();
-                form.querySelectorAll(".pb-card").forEach(function(card){
-                    var name = ((card.querySelector(".pb-name") || {}).textContent || "").toLowerCase();
-                    card.style.display = (!query || name.indexOf(query) !== -1) ? "" : "none";
-                });
-            }
+        // Sticky bar chips + indicator (with thumbs)
+        function updateTopBar(form){
+            var topWrap = form.querySelector("#pb-picked-top");
+            var indicator = form.querySelector("#pb-step-indicator");
+            if(!topWrap || !indicator) return;
 
-            if (e.target && e.target.id === "pb-project-size") {
-                syncProjectFields();
+            var sels = Array.prototype.map.call(
+                form.querySelectorAll(".pb-choice:checked"),
+                function(c){ return { name:c.getAttribute("data-name")||c.value, thumb:c.getAttribute("data-thumb")||"" }; }
+            );
+            if (!sels.length){
+                topWrap.innerHTML = "";
+            } else {
+                topWrap.innerHTML = sels.map(function(o){
+                    var img = o.thumb ? \'<img src="\' + esc(o.thumb) + \'" alt="">\' : "";
+                    return \'<span class="pb-chip" data-value="\' + esc(o.name) + \'">\' + img + esc(o.name) + \'<button type="button" class="remove" aria-label="Remove \' + esc(o.name) + \'">&times;</button></span>\';
+                }).join("");
+            }
+            var max = maxAllowed(form);
+            var sel = selectedCount(form);
+            indicator.textContent = sel + "/" + max + " selected";
+        }
+
+        // Sticky shadow when bar reaches top
+        (function(){
+            window.addEventListener("scroll", ()=>{
+                const bar = document.querySelector("#pb-sticky-bar");
+                if(!bar) return;
+                const rect = bar.getBoundingClientRect();
+                if(rect.top <= 0){ bar.classList.add("pb-shadow"); }
+                else{ bar.classList.remove("pb-shadow"); }
+            }, {passive:true});
+        })();
+
+        // Error helpers (for details step)
+        function banner(form){ return form.querySelector(".pb-error-banner"); }
+        function clearErrors(form){
+            var bad = form.querySelectorAll(".is-invalid");
+            for (var i=0;i<bad.length;i++){ bad[i].classList.remove("is-invalid"); bad[i].removeAttribute("aria-invalid"); }
+            var b = banner(form);
+            if (b){ b.classList.remove("show"); b.textContent=""; }
+        }
+        function showError(form, fields){
+            var b = banner(form);
+            if (b){ b.textContent = "Please check the highlighted fields."; b.classList.add("show"); }
+            if (fields && fields.length){ try{ fields[0].focus(); }catch(e){} }
+        }
+
+        function initForm(form){
+            if (!form || form.dataset.pbInit) return;
+            form.dataset.pbInit = "1";
+            var maxEl   = form.querySelector("#pb-max");
+            var max = parseInt(maxEl ? (maxEl.value||"4") : "4", 10);
+            var maxCount = form.querySelector("#pb-max-count");
+            var pbLimit = form.querySelector("#pb-limit");
+            if (maxCount) maxCount.textContent = String(max);
+            if (pbLimit) pbLimit.textContent = String(max);
+
+            // Start on Step 1 (selection)
+            showStep(form, 0);
+            setContext(form);
+            toggleOrg(form);
+            updateCount(form);
+            updateSelectedVisual(form);
+            updateSelectedList(form);
+            updateTopBar(form);
+        }
+        function scan(){ var forms = document.querySelectorAll("#pb-samples-form"); for (var i=0;i<forms.length;i++) initForm(forms[i]); }
+
+        function toggleOrg(form){
+            var enquiry = form.querySelector("#pb-enquiry");
+            var wrap = form.querySelector("#pb-org-wrap");
+            var v = enquiry ? enquiry.value : "";
+            if (wrap){ wrap.style.display = (v && v !== "homeowner") ? "block" : "none"; }
+        }
+
+        function validateStep1(form){ // used for details step (index 1)
+    clearErrors(form);
+    var ids = ["pb-first","pb-last","pb-email","pb-phone","pb-enquiry","pb-street","pb-city","pb-county","pb-country","pb-postcode"];
+    var invalid = [];
+
+    // Skip postcode if "No postcode" is checked or field disabled
+    var noPostcodeCheck = form.querySelector("#pb-no-postcode-check");
+    var skipPostcode = noPostcodeCheck && noPostcodeCheck.checked;
+    if (skipPostcode) {
+        ids = ids.filter(function(id){ return id !== "pb-postcode"; });
+    }
+
+    for (var i=0;i<ids.length;i++){
+        var el = form.querySelector("#"+ids[i]);
+        if (!el || el.disabled || !el.value || !el.value.trim()){ invalid.push(el); }
+    }
+
+    var emailEl = form.querySelector("#pb-email");
+    if (emailEl && emailEl.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailEl.value)){ invalid.push(emailEl); }
+    var phoneEl = form.querySelector("#pb-phone");
+    if (phoneEl && phoneEl.value && !/^([0-9()\+\- ]*)$/.test(phoneEl.value)){ invalid.push(phoneEl); }
+    var gdpr = form.querySelector("#pb-gdpr");
+    if (!gdpr || !gdpr.checked){ invalid.push(gdpr); }
+
+    if (invalid.length){
+        for (var j=0;j<invalid.length;j++){
+            if (invalid[j]){
+                invalid[j].classList.add("is-invalid");
+                invalid[j].setAttribute("aria-invalid","true");
+            }
+        }
+        showError(form, invalid);
+        return false;
+    }
+    return true;
+}
+
+
+        // Clear invalid highlight as user types
+        document.addEventListener("input", function(e){
+            var el = e.target;
+            var form = el.closest && el.closest("#pb-samples-form");
+            if (!form) return;
+            if (el.id === "pb-search"){ filterProducts(form); return; }
+            if (el.id === "pb-project-size"){ syncProjectFields(form); }
+            if (el.classList && el.classList.contains("is-invalid")){
+                el.classList.remove("is-invalid"); el.removeAttribute("aria-invalid");
+                var b = banner(form);
+                if (b){ b.classList.remove("show"); b.textContent=""; }
             }
         });
+        document.addEventListener("change", function(e){
+            var el = e.target;
+            var form = el.closest && el.closest("#pb-samples-form");
+            if (!form) return;
 
-        form.addEventListener("change", function(e){
-            if (e.target && e.target.classList.contains("pb-choice")) {
-                if (picks().length > max) {
-                    e.target.checked = false;
+            if (el.id === "pb-enquiry"){ toggleOrg(form); return; }
+            if (el.name === "project_type[]"){ syncProjectFields(form); return; }
+
+            if (el.classList && el.classList.contains("pb-choice")){
+                var max = maxAllowed(form);
+                if (selectedCount(form) > max){
+                    el.checked = false;
                     alert("You can select a maximum of " + max + " samples.");
                 }
-                update();
+                updateCount(form);
+                updateSelectedVisual(form);
+                updateSelectedList(form);
+                updateTopBar(form);
+                if (currentStepIndex(form) === 2){ renderReviewGrid(form); } // update live if already on review
+                return;
             }
 
-            if (e.target && e.target.id === "pb-enquiry") {
-                var wrap = form.querySelector("#pb-org-wrap");
-                if (wrap) {
-                    wrap.style.display = (e.target.value && e.target.value !== "homeowner") ? "block" : "none";
-                }
-            }
-
-            if (e.target && e.target.name === "project_type[]") {
-                syncProjectFields();
-            }
+            if (el.id === "pb-type"){ filterProducts(form); return; }
         });
 
-        form.addEventListener("click", function(e){
-            var next = e.target.closest("[data-next]");
-            if (next) {
-                var current = stepIndex();
-                if (current === 0 && picks().length === 0) {
+        // Ready + popup hooks
+        if (document.readyState === "loading"){ document.addEventListener("DOMContentLoaded", scan); } else { scan(); }
+        if (window.jQuery){ jQuery(document).on("elementor/popup/show", function(){ scan(); }); }
+        if (window.elementorFrontend && window.elementorFrontend.hooks){
+            try{
+                window.elementorFrontend.hooks.addAction("popup:after_open", function(){ scan(); });
+                window.elementorFrontend.hooks.addAction("frontend/element_ready/global", function(){ scan(); });
+            }catch(e){}
+        }
+        try{
+            var mo = new MutationObserver(function(){ scan(); });
+            mo.observe(document.documentElement, { childList:true, subtree:true });
+        }catch(e){}
+
+        function closePopup(){
+            // Elementor Pro API
+            if (window.elementorProFrontend && elementorProFrontend.modules && elementorProFrontend.modules.popup){
+                try{ elementorProFrontend.modules.popup.closePopup(); return true; }catch(e){}
+            }
+            // Elementor core
+            if (window.elementorFrontend && elementorFrontend.modules && elementorFrontend.modules.popup && elementorFrontend.modules.popup.closePopup){
+                try{ elementorFrontend.modules.popup.closePopup(); return true; }catch(e){}
+            }
+            // Fallbacks
+            var btn = document.querySelector(".elementor-popup-modal .dialog-close-button, .elementor-popup-modal [aria-label=\'Close\']");
+            if (btn){ btn.click(); return true; }
+            var modal = document.querySelector(".elementor-popup-modal");
+            if (modal){ modal.parentNode.removeChild(modal); return true; }
+            try{ document.dispatchEvent(new KeyboardEvent("keydown",{key:"Escape"})); }catch(e){}
+            return false;
+        }
+
+        // Delegated clicks
+        document.addEventListener("click", function(e){
+            var nextBtn = e.target.closest("button[data-next]");
+            if (nextBtn){
+                var form = nextBtn.closest("#pb-samples-form");
+                if (!form) return;
+                var idx = currentStepIndex(form);
+
+                // Step 0 = selection; require at least one
+                if (idx===0 && selectedCount(form)===0){
                     alert("Please select at least one sample.");
                     return;
                 }
-                if (current === 1 && !form.checkValidity()) {
-                    form.reportValidity();
-                    return;
-                }
-                show(Math.min(current + 1, 2));
+                // Step 1 = details; validate
+                if (idx===1 && !validateStep1(form)) return;
+
+                showStep(form, Math.min(idx+1, steps(form).length-1));
                 return;
             }
-
-            var prev = e.target.closest("[data-prev]");
-            if (prev) {
-                show(Math.max(stepIndex() - 1, 0));
+            var prevBtn = e.target.closest("button[data-prev]");
+            if (prevBtn){
+                var form2 = prevBtn.closest("#pb-samples-form");
+                if (!form2) return;
+                var idx2 = currentStepIndex(form2);
+                showStep(form2, Math.max(idx2-1, 0));
                 return;
             }
+            var submitBtn = e.target.closest("#pb-submit");
+            if (submitBtn){
+                var form3 = submitBtn.closest("#pb-samples-form");
+                if (!form3) return;
+                if (form3.dataset.pbSubmitted === "1") return; // guard
+                var statusEl = form3.querySelector("#pb-status");
+                if (statusEl) statusEl.innerHTML = "<p>Submitting...</p>";
+                submitBtn.disabled = true;
+                setContext(form3);
+                syncProjectFields(form3);
 
-            var submit = e.target.closest("#pb-submit");
-            if (submit) {
-                var status = form.querySelector("#pb-status");
-                var finish = form.querySelector("#pb-finish");
-
-                setContext();
-                syncProjectFields();
-                var fd = new FormData(form);
-                submit.disabled = true;
-
-                if (status) {
-                    status.innerHTML = "<p>Submitting...</p>";
-                }
-
-                picks().forEach(function(choice){
-                    fd.append("product_names[]", choice.dataset.name || choice.value);
-                    fd.append("product_skus[]", choice.dataset.sku || "");
+                // Build FormData and append aligned names + skus
+                var fd = new FormData(form3);
+                var picks = form3.querySelectorAll(".pb-choice:checked");
+                picks.forEach(function(c){
+                    fd.append("product_names[]", c.getAttribute("data-name") || c.value);
+                    fd.append("product_skus[]",  c.getAttribute("data-sku")  || "");
                 });
 
-                fetch(PBSAMPLES.ajax_url, {
-                    method: "POST",
-                    body: fd,
-                    headers: {"X-Requested-With":"XMLHttpRequest"}
-                })
-                .then(function(response){ return response.json(); })
-                .then(function(response){
-                    var relay = response && response.data && response.data.relay ? response.data.relay : null;
-
-                    if (!response || !response.success || !relay) {
-                        if (status) {
-                            status.innerHTML = "<p class=\"err\">" + ((response && response.data && response.data.message) || "Submission failed") + "</p>";
-                        }
-                        submit.disabled = false;
+                fetch(PBSAMPLES.ajax_url, { method:"POST", body:fd, headers: { "X-Requested-With": "XMLHttpRequest" }})
+                .then(function(res){ return res.json(); })
+                .then(function(data){
+                    var relay = data && data.data && data.data.relay ? data.data.relay : null;
+                    if (relay && relay.status === "blocked") {
+                        if (statusEl) statusEl.innerHTML = "<p class=\'warn\'>" + esc(relay.message || "This request cannot be submitted right now.") + "</p>";
                         return;
                     }
+                    if (data && data.success) {
+    if (statusEl) statusEl.innerHTML = "<p class=\'ok\'><span style=\'font-size: 2em; font-weight: 700; color: #2f7d32\'>Submission successful</span> </br>Thank you for requesting samples. We have received your request and will process them for dispatch. You can expect them to arrive within around 3-5 days and if you have any questions in the meantime, please feel free to contact us through the <a href=\'/contact/\'>contact page</a></p>";
 
-                    if (relay.status === "accepted" || relay.status === "duplicate") {
-                        if (status) {
-                            status.innerHTML = "<p class=\"ok\">" + esc(relay.message || "Submission successful") + "</p>";
-                        }
-                        if (finish) {
-                            finish.hidden = false;
-                        }
-                        return;
-                    }
+    // Hide review summary text if desired
+    var review = form3.querySelector("#pb-review");
+    if (review) review.style.display = "none";
 
-                    if (relay.status === "blocked") {
-                        if (status) {
-                            status.innerHTML = "<p class=\"warn\">" + esc(relay.message || "This request cannot be submitted right now.") + "</p>";
-                        }
-                        if (finish) {
-                            finish.hidden = false;
-                        }
-                        return;
-                    }
+    // Hide Submit button
+    submitBtn.hidden = true;
+    submitBtn.style.display = "none";
+    form3.dataset.pbSubmitted = "1";
 
-                    if (status) {
-                        status.innerHTML = "<p class=\"err\">" + esc(relay.message || "Submission failed") + "</p>";
+    // Hide ONLY the Previous button in Step 3
+    var prevBtns = form3.querySelectorAll(".pb-step[data-step=\'3\'] [data-prev]");
+    prevBtns.forEach(function(btn){
+        btn.hidden = true;
+        btn.style.display = "none";
+        btn.classList.add("pb-hidden");
+    });
+
+    // Disable all form fields except Close
+    Array.prototype.forEach.call(form3.querySelectorAll("input,select,textarea,button"), function(el){
+        if (el.id !== "pb-finish") el.disabled = true;
+    });
+
+    // Show Close button now that submission succeeded
+    var finishBtn = form3.querySelector("#pb-finish");
+    if (finishBtn){
+        finishBtn.hidden = false;
+        finishBtn.disabled = false;
+        finishBtn.style.display = "inline-block";
+        finishBtn.classList.remove("pb-hidden");
+    }
+
+    // Adjust layout so Close aligns neatly
+    var nav = form3.querySelector(".pb-step[data-step=\'3\'] .pb-nav");
+    if (nav){
+        nav.style.justifyContent = "flex-end";
+    }
+}
+
+
+ else {
+                        throw new Error((data && data.data && data.data.message) ? data.data.message : "Unknown error");
                     }
-                    submit.disabled = false;
                 })
                 .catch(function(){
-                    if (status) {
-                        status.innerHTML = "<p class=\"err\">Submission failed</p>";
-                    }
-                    submit.disabled = false;
-                });
+                    if (statusEl) statusEl.innerHTML = "<p class=\\"err\\">There was an error with your submission. Please try again.</p>";
+                })
+                .finally(function(){ submitBtn.disabled = false; });
                 return;
             }
-
-            var finish = e.target.closest("#pb-finish");
-            if (finish && window.elementorProFrontend && elementorProFrontend.modules && elementorProFrontend.modules.popup) {
-                try {
-                    elementorProFrontend.modules.popup.closePopup();
-                } catch (ex) {}
+            // Remove chip (works for sticky top)
+            var removeBtn = e.target.closest(".pb-chip .remove");
+            if (removeBtn){
+                var form4 = removeBtn.closest("#pb-samples-form") || document.querySelector("#pb-samples-form");
+                if (!form4) return;
+                var value = removeBtn.parentElement.getAttribute("data-value") || "";
+                var inputs = form4.querySelectorAll(".pb-choice");
+                for (var i=0;i<inputs.length;i++){
+                    if (inputs[i].getAttribute("data-name") === value || inputs[i].value === value){
+                        inputs[i].checked = false;
+                        updateCount(form4);
+                        updateSelectedVisual(form4);
+                        updateSelectedList(form4);
+                        updateTopBar(form4);
+                        if (currentStepIndex(form4) === 2){ renderReviewGrid(form4); }
+                        break;
+                    }
+                }
+                return;
+            }
+            // Finish button
+            var fin = e.target.closest("#pb-finish");
+            if (fin){
+                closePopup();
+                return;
             }
         });
 
-        setContext();
-        syncProjectFields();
-        update();
-        show(0);
+        // Accordion: only one open at a time
+        document.addEventListener("toggle", function(e){
+            if(e.target && e.target.matches(".pb-accordion[open]")){
+                document.querySelectorAll(".pb-accordion").forEach(function(d){
+                    if(d!==e.target) d.removeAttribute("open");
+                });
+            }
+        });
+
+        // Boot
+        // (scan already called above)
+		// --- Google Places Autocomplete for address fields ---
+window.initPbAddressAutocomplete = function () {
+    if (typeof google === "undefined" || !google.maps || !google.maps.places) return;
+
+    var input = document.getElementById("pb-street");
+    if (!input) return; // Field not yet rendered
+
+    // Prevent multiple bindings
+    if (input.dataset.pbAutocompleteInit === "1") return;
+    input.dataset.pbAutocompleteInit = "1";
+
+    var autocomplete = new google.maps.places.Autocomplete(input, {
+        types: ["address"],
+        fields: ["address_components", "formatted_address"],
+		
+
+    });
+
+autocomplete.addListener("place_changed", function () {
+    var place = autocomplete.getPlace();
+    if (!place || !place.address_components) return;
+
+    var comps = {};
+    place.address_components.forEach(function (c) {
+        c.types.forEach(function (t) {
+            comps[t] = c.long_name || "";
+        });
+    });
+
+    // Construct full street
+    var street = "";
+    if (comps.street_number) street += comps.street_number + " ";
+    if (comps.route) street += comps.route;
+
+    // City / Town logic (UK-friendly)
+    var city = comps.postal_town || comps.locality || comps.sublocality || "";
+
+    // County logic (UK-friendly)
+    var county = comps.administrative_area_level_2 || comps.administrative_area_level_1 || "";
+
+    // Populate standard fields
+    document.getElementById("pb-street").value = street.trim() || place.formatted_address || "";
+    if (document.getElementById("pb-city")) document.getElementById("pb-city").value = city;
+    if (document.getElementById("pb-country")) document.getElementById("pb-country").value = comps.country || "";
+    if (document.getElementById("pb-postcode")) document.getElementById("pb-postcode").value = comps.postal_code || "";
+
+    // Determine country behaviour
+    var country = (comps.country || "").toLowerCase();
+    var countyField = document.getElementById("pb-county");
+    var postcodeField = document.getElementById("pb-postcode");
+
+    // Handle County visibility
+    if (countyField) {
+        if (country === "united kingdom" || country === "uk" || country === "great britain") {
+            countyField.value = county;
+            countyField.parentElement.style.display = "";
+        } else {
+            countyField.value = "";
+            countyField.parentElement.style.display = "none";
+        }
     }
 
-    if (document.readyState === "loading") {
-        document.addEventListener("DOMContentLoaded", scan);
-    } else {
-        scan();
+    // Create or reference "No postcode" checkbox container
+    if (postcodeField) {
+        var wrapper = postcodeField.parentElement;
+        var existingBox = wrapper.querySelector(".pb-no-postcode");
+
+        if (!existingBox) {
+            var div = document.createElement("div");
+            div.className = "pb-no-postcode";
+            div.innerHTML = `
+                <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:0.9em;cursor:pointer;">
+                    <input type="checkbox" id="pb-no-postcode-check" style="width:auto;vertical-align:middle;" />
+                    <span>No postcode</span>
+                </label>
+            `;
+            wrapper.appendChild(div);
+        }
+
+        var checkbox = document.getElementById("pb-no-postcode-check");
+
+        // Only show checkbox for non-UK countries
+        if (country === "united kingdom" || country === "uk" || country === "great britain") {
+            if (checkbox) {
+                checkbox.checked = false;
+                checkbox.closest(".pb-no-postcode").style.display = "none";
+            }
+            postcodeField.setAttribute("required", "required");
+        } else {
+            if (checkbox) checkbox.closest(".pb-no-postcode").style.display = "block";
+
+            // Handle checkbox toggle behaviour
+            checkbox.addEventListener("change", function () {
+                if (this.checked) {
+                    postcodeField.removeAttribute("required");
+                    postcodeField.value = "";
+                    postcodeField.disabled = true;
+                    postcodeField.placeholder = "Postcode not required";
+                } else {
+                    postcodeField.disabled = false;
+                    postcodeField.placeholder = "Postcode";
+                    postcodeField.setAttribute("required", "required");
+                }
+            });
+        }
+    }
+});
+
+
+
+};
+
+// Load Google Maps Places API async (best-practice pattern)
+(function(){
+    function loadScript(){
+        if (window.google && google.maps && google.maps.places) {
+            window.initPbAddressAutocomplete();
+            return;
+        }
+        const s = document.createElement("script");
+        s.src = "https://maps.googleapis.com/maps/api/js?key=AIzaSyBxKqn1sTfyz3FF7105u5Dfi-NvOxMTuNQ&libraries=places&callback=initPbAddressAutocomplete&loading=async";
+        s.async = true;
+        s.defer = true;
+        document.head.appendChild(s);
     }
 
+    // Initial load
+    loadScript();
+
+    // Re-init when Elementor popups open
     if (window.jQuery) {
-        jQuery(document).on("elementor/popup/show", scan);
+        jQuery(document).on("elementor/popup/show", function(){
+            if (window.google && google.maps && google.maps.places) {
+                setTimeout(window.initPbAddressAutocomplete, 500);
+            }
+        });
     }
-})();
-JS;
 
+    // Defensive: if no Elementor events, check periodically for field
+    var retry = setInterval(function(){
+        if (document.getElementById("pb-street") && window.google && google.maps && google.maps.places) {
+            clearInterval(retry);
+            window.initPbAddressAutocomplete();
+        }
+    }, 2000);
+})();
+
+
+    })();
+    ';
+    wp_add_inline_script('pb-samples-js', $js);
         wp_add_inline_script('pb-samples-js', $js);
     }
 
@@ -755,3 +1211,4 @@ JS;
 }
 
 PBSR_Product_Selection_Form::init();
+
