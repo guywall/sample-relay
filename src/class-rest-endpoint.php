@@ -37,6 +37,8 @@ class PBSR_Rest_Endpoint {
             [
                 'samples' => $data['samples'] ?? [],
                 'blends' => $data['sample_names'] ?? ($data['blends'] ?? []),
+                'project_type' => self::normalizeProjectType($data['project_type'] ?? []),
+                'project_size_m2' => self::normalizeProjectSize($data['project_size_m2'] ?? ''),
                 'reference' => $data['reference'] ?? '',
                 'notes' => $data['notes'] ?? '',
                 'source' => $source,
@@ -57,6 +59,24 @@ class PBSR_Rest_Endpoint {
                 'details' => $e->getMessage(),
             ], 500);
         }
+    }
+
+    private static function normalizeProjectType($value) {
+        if (is_string($value)) {
+            $value = preg_split('/[\r\n,;]+/', $value);
+        }
+
+        return array_values(array_filter(array_map('sanitize_text_field', (array) $value)));
+    }
+
+    private static function normalizeProjectSize($value) {
+        $value = sanitize_text_field((string) $value);
+
+        if ($value === '' || !preg_match('/^\d+$/', $value)) {
+            return '';
+        }
+
+        return (int) $value;
     }
 }
 
