@@ -63,19 +63,27 @@ class PBSR_Installer {
         global $wpdb;
 
         $table = $wpdb->prefix . 'pbsr_logs';
+        $last_id = 0;
+
         do {
             $rows = $wpdb->get_results(
-                "SELECT id, source, payload, request_status, blocked_reason, crm_status, books_status
-                 FROM {$table}
-                 WHERE request_status IS NULL
-                    OR request_status = ''
-                    OR requester_email IS NULL
-                    OR requester_email = ''
-                    OR household_key IS NULL
-                    OR lead_channel IS NULL
-                    OR lead_channel = ''
-                 ORDER BY id ASC
-                 LIMIT 250",
+                $wpdb->prepare(
+                    "SELECT id, source, payload, request_status, blocked_reason, crm_status, books_status
+                     FROM {$table}
+                     WHERE id > %d
+                       AND (
+                            request_status IS NULL
+                            OR request_status = ''
+                            OR requester_email IS NULL
+                            OR requester_email = ''
+                            OR household_key IS NULL
+                            OR lead_channel IS NULL
+                            OR lead_channel = ''
+                       )
+                     ORDER BY id ASC
+                     LIMIT 250",
+                    $last_id
+                ),
                 ARRAY_A
             );
 
@@ -105,6 +113,8 @@ class PBSR_Installer {
                     ['%s', '%s', '%s', '%s', '%s', '%s'],
                     ['%d']
                 );
+
+                $last_id = (int) $row['id'];
             }
         } while (!empty($rows));
     }
