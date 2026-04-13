@@ -37,8 +37,14 @@ class PBSR_Rest_Endpoint {
             [
                 'samples' => $data['samples'] ?? [],
                 'blends' => $data['sample_names'] ?? ($data['blends'] ?? []),
-                'project_type' => self::normalizeProjectType($data['project_type'] ?? []),
-                'project_size_m2' => self::normalizeProjectSize($data['project_size_m2'] ?? ''),
+                'project_type' => self::normalizeProjectType(
+                    $data['project_type'] ??
+                    ($data['project_type_serialized'] ?? ($data['project_type_value'] ?? ($data['contact']['project_type'] ?? [])))
+                ),
+                'project_size_m2' => self::normalizeProjectSize(
+                    $data['project_size_m2'] ??
+                    ($data['project_size'] ?? ($data['project_size_value'] ?? ($data['contact']['project_size_m2'] ?? '')))
+                ),
                 'reference' => $data['reference'] ?? '',
                 'notes' => $data['notes'] ?? '',
                 'source' => $source,

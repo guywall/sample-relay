@@ -20,6 +20,7 @@ class PBSR_Dispatcher {
         }
 
         $raw = self::flattenPayload($raw);
+        $raw = self::normalizeSupplementalFields($raw);
         $map = $settings['field_map'];
         $data = PBSR_Mapper::canonicalize($raw, $map);
         $data['blends'] = self::resolveBlends($raw, $map);
@@ -160,6 +161,35 @@ class PBSR_Dispatcher {
         return $raw;
     }
 
+    private static function normalizeSupplementalFields(array $raw) {
+        $project_type = self::extractFirstNonEmptyValue($raw, [
+            ['project_type'],
+            ['project_type[]'],
+            ['project_types'],
+            ['project_type_serialized'],
+            ['project_type_value'],
+            ['contact', 'project_type'],
+            ['contact', 'project_types'],
+            ['context', 'project_type'],
+            ['context', 'project_types'],
+        ]);
+
+        $project_size = self::extractFirstNonEmptyValue($raw, [
+            ['project_size_m2'],
+            ['project_size'],
+            ['project_size_value'],
+            ['contact', 'project_size_m2'],
+            ['contact', 'project_size'],
+            ['context', 'project_size_m2'],
+            ['context', 'project_size'],
+        ]);
+
+        $raw['project_type'] = self::normalizeProjectType($project_type);
+        $raw['project_size_m2'] = self::normalizeProjectSize($project_size);
+
+        return $raw;
+    }
+
     private static function resolveBlends(array $raw, array $map) {
         $blends = $raw[$map['blends']] ?? $raw['blends'] ?? $raw['sample_names'] ?? [];
 
@@ -176,6 +206,73 @@ class PBSR_Dispatcher {
         $raw['email'] = $data['email'] ?? ($raw['email'] ?? '');
 
         return $raw;
+    }
+
+    private static function extractFirstNonEmptyValue(array $source, array $paths) {
+        foreach ($paths as $path) {
+            $value = self::valueAtPath($source, $path);
+            if ($value === null) {
+                continue;
+            }
+
+            if (is_array($value) && !empty(array_filter($value, function ($item) {
+                return $item !== null && $item !== '';
+            }))) {
+                return $value;
+            }
+
+            if (!is_array($value) && trim((string) $value) !== '') {
+                return $value;
+            }
+        }
+
+        foreach ($paths as $path) {
+            $value = self::valueAtPath($source, $path);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    private static function valueAtPath(array $source, array $path) {
+        $value = $source;
+
+        foreach ($path as $segment) {
+            if (!is_array($value) || !array_key_exists($segment, $value)) {
+                return null;
+            }
+
+            $value = $value[$segment];
+        }
+
+        return $value;
+    }
+
+    private static function normalizeProjectType($value) {
+        if (is_string($value)) {
+            $value = preg_split('/[\r\n,;|]+/', $value);
+        }
+
+        $allowed = ['Path/Patio', 'Driveway', 'Other'];
+        $values = array_map('sanitize_text_field', (array) $value);
+
+        return array_values(array_intersect($allowed, $values));
+    }
+
+    private static function normalizeProjectSize($value) {
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        $value = sanitize_text_field((string) $value);
+
+        if ($value === '' || !preg_match('/^\d+$/', $value)) {
+            return '';
+        }
+
+        return (int) $value;
     }
 
     private static function repeatLimitMessage($days) {

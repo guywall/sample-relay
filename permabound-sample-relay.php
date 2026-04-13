@@ -2,7 +2,7 @@
 /**
  * Plugin Name: PERMABOUND Sample Relay
  * Description: Sends sample requests from forms to Zoho Books & Zoho CRM with logs, retries, and Elementor integration.
- * Version: 1.7.3
+ * Version: 1.7.4
  * Author: You
  */
 
@@ -10,7 +10,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('PBSR_VER', '1.7.3');
+define('PBSR_VER', '1.7.4');
 define('PBSR_SLUG', 'permabound-sample-relay');
 define('PBSR_PATH', plugin_dir_path(__FILE__));
 define('PBSR_URL', plugin_dir_url(__FILE__));

@@ -213,10 +213,12 @@ class PBSR_Product_Selection_Form {
                                 <span>Other</span>
                             </label>
                         </div>
+                        <input type="hidden" name="project_type_serialized" value="">
                     </fieldset>
                     <div class="pb-field">
                         <label for="pb-project-size">Project Size in m&sup2;</label>
                         <input id="pb-project-size" name="project_size_m2" type="number" inputmode="numeric" min="0" step="1">
+                        <input type="hidden" name="project_size_value" value="">
                     </div>
                 </div>
 
@@ -419,6 +421,23 @@ CSS;
             }
         }
 
+        function syncProjectFields(){
+            var projectTypes = [].slice.call(form.querySelectorAll('input[name="project_type[]"]:checked')).map(function(input){
+                return input.value || "";
+            }).filter(Boolean);
+            var projectSize = (form.querySelector("#pb-project-size") || {}).value || "";
+            var projectTypeHidden = form.querySelector('input[name="project_type_serialized"]');
+            var projectSizeHidden = form.querySelector('input[name="project_size_value"]');
+
+            if (projectTypeHidden) {
+                projectTypeHidden.value = projectTypes.join(", ");
+            }
+
+            if (projectSizeHidden) {
+                projectSizeHidden.value = projectSize;
+            }
+        }
+
         function renderGrid(){
             var grid = form.querySelector("#pb-review-grid");
             if (!grid) {
@@ -450,6 +469,10 @@ CSS;
                     card.style.display = (!query || name.indexOf(query) !== -1) ? "" : "none";
                 });
             }
+
+            if (e.target && e.target.id === "pb-project-size") {
+                syncProjectFields();
+            }
         });
 
         form.addEventListener("change", function(e){
@@ -466,6 +489,10 @@ CSS;
                 if (wrap) {
                     wrap.style.display = (e.target.value && e.target.value !== "homeowner") ? "block" : "none";
                 }
+            }
+
+            if (e.target && e.target.name === "project_type[]") {
+                syncProjectFields();
             }
         });
 
@@ -497,6 +524,7 @@ CSS;
                 var finish = form.querySelector("#pb-finish");
 
                 setContext();
+                syncProjectFields();
                 var fd = new FormData(form);
                 submit.disabled = true;
 
@@ -569,6 +597,7 @@ CSS;
         });
 
         setContext();
+        syncProjectFields();
         update();
         show(0);
     }
@@ -613,8 +642,8 @@ JS;
         $page_url = esc_url_raw(wp_unslash($_POST['page_url'] ?? ''));
         $referrer = esc_url_raw(wp_unslash($_POST['referrer'] ?? ''));
         $current_product = sanitize_text_field(wp_unslash($_POST['current_product'] ?? ''));
-        $project_type = self::sanitize_project_types((array) wp_unslash($_POST['project_type'] ?? []));
-        $project_size_raw = sanitize_text_field(wp_unslash($_POST['project_size_m2'] ?? ''));
+        $project_type = self::sanitize_project_types(wp_unslash($_POST['project_type'] ?? ($_POST['project_type_serialized'] ?? [])));
+        $project_size_raw = sanitize_text_field(wp_unslash($_POST['project_size_m2'] ?? ($_POST['project_size_value'] ?? '')));
         $project_size = ($project_size_raw !== '' && preg_match('/^\d+$/', $project_size_raw)) ? (int) $project_size_raw : '';
 
         $product_names = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_names'] ?? ($_POST['product_selection'] ?? [])));
@@ -712,9 +741,14 @@ JS;
         return '';
     }
 
-    private static function sanitize_project_types(array $values) {
+    private static function sanitize_project_types($values) {
         $allowed = ['Path/Patio', 'Driveway', 'Other'];
-        $sanitized = array_map('sanitize_text_field', $values);
+
+        if (is_string($values)) {
+            $values = preg_split('/[\r\n,;|]+/', $values);
+        }
+
+        $sanitized = array_map('sanitize_text_field', (array) $values);
 
         return array_values(array_intersect($allowed, $sanitized));
     }
