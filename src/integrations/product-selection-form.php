@@ -108,7 +108,7 @@ class PBSR_Product_Selection_Form {
                     $open = $slug === 'resin-bound-stone-blends' ? ' open' : '';
                     echo '<details class="pb-accordion"' . $open . '>';
                     echo '<summary class="pb-cat-title" data-cat="' . esc_attr($slug) . '">' . esc_html($term->name) . '</summary>';
-                    echo '<div class="pb-grid pb-products" data-cat="' . esc_attr($slug) . '">';
+                    echo '<div class="pb-products" data-cat="' . esc_attr($slug) . '">';
 
                     foreach ($query->posts as $product_id) {
                         if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
@@ -337,7 +337,7 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 .pb-form .button.button-primary{background:var(--pb-brand)!important;border-color:var(--pb-brand)!important;color:#111!important;font-weight:700;box-shadow:0 1px 0 rgba(0,0,0,.06)}
 .pb-form .button.button-primary:hover{background:var(--pb-brand-700)!important;border-color:var(--pb-brand-700)!important}
 .pb-form input[type="checkbox"]{accent-color:var(--pb-brand)}
-.pb-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
+#pb-samples-form .pb-products{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px}
 .pb-card{display:flex;flex-direction:column;align-items:center;gap:8px;border:1px solid var(--pb-border-soft);border-radius:14px;padding:12px;cursor:pointer;position:relative;transition:border-color .15s,box-shadow .15s,transform .05s,background .15s;background:#fff;text-align:center}
 .pb-card input{position:absolute;opacity:0;pointer-events:none}
 .pb-card img{width:120px;height:auto;border-radius:10px}
@@ -367,7 +367,7 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 .pb-sticky-meta{display:flex;justify-content:space-between;align-items:center;gap:10px}
 .pb-step-indicator{font-weight:800;font-size:.95rem}
 .pb-next-top{padding:6px 14px;font-weight:700;border-radius:8px}
-.pb-review-grid{margin:14px 0 4px 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+#pb-samples-form .pb-review-grid{margin:14px 0 4px 0;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
 .pb-review-tile{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--pb-border-soft);background:#fafafa;box-shadow:inset 0 1px 2px rgba(0,0,0,.02);aspect-ratio:1/1;display:flex;align-items:flex-end;justify-content:flex-start}
 .pb-review-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
 .pb-review-name{position:relative;color:#fff;font-weight:800;font-size:.95rem;padding:8px;z-index:1;letter-spacing:.01em}
@@ -388,18 +388,18 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 #pb-samples-form .pb-check-option span{display:block;flex:1 1 auto;font-weight:700}
 #pb-samples-form .pb-consent{margin-top:18px}
 @media (max-width:1100px){
-    .pb-products{grid-template-columns:repeat(3,minmax(0,1fr))}
-    .pb-review-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+    #pb-samples-form .pb-products{grid-template-columns:repeat(3,minmax(0,1fr))}
+    #pb-samples-form .pb-review-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
 @media (max-width:820px){
-    .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))}
-    .pb-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #pb-samples-form .pb-products{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #pb-samples-form .pb-review-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @media (max-width:640px){
     .pb-grid{grid-template-columns:1fr}
     .pb-filter{flex-direction:column}
-    .pb-products{grid-template-columns:1fr}
-    .pb-review-grid{grid-template-columns:1fr}
+    #pb-samples-form .pb-products{grid-template-columns:1fr}
+    #pb-samples-form .pb-review-grid{grid-template-columns:1fr}
     .pb-sticky-inner{gap:6px}
     .pb-sticky-meta{flex-direction:column;align-items:flex-start}
     .pb-next-top{align-self:flex-end}
