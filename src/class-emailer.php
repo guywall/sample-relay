@@ -15,55 +15,59 @@ class PBSR_Emailer {
         }
 
         $attribution = $raw['context']['attribution'] ?? [];
-        $subject = sprintf(
-            '[%s] Sample request %s',
-            wp_specialchars_decode(get_bloginfo('name'), ENT_QUOTES),
-            strtolower((string) ($result['status'] ?? 'accepted'))
-        );
+        $name = trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
+        $subject = 'New PERMABOUND Sample Request - ' . ($name !== '' ? $name : 'Unknown');
 
         $address = self::fullAddress($raw, $data);
-        $message = [];
-        $message[] = 'Request status: ' . ($result['status'] ?? 'accepted');
-        if (!empty($result['message'])) {
-            $message[] = 'Message: ' . $result['message'];
-        }
-        if (!empty($result['blocked_reason'])) {
-            $message[] = 'Blocked reason: ' . $result['blocked_reason'];
-        }
-        $message[] = 'Name: ' . trim(($data['first_name'] ?? '') . ' ' . ($data['last_name'] ?? ''));
-        $message[] = 'Company: ' . ($data['company'] ?? $raw['organisation_name'] ?? '');
-        $message[] = 'Email: ' . ($data['email'] ?? '');
-        $message[] = 'Phone: ' . ($data['phone'] ?? '');
-        if ($address !== '') {
-            $message[] = 'Address: ' . $address;
-        }
-        $message[] = 'Samples: ' . implode(', ', $data['blends'] ?? []);
         $project_type = array_values(array_filter((array) ($raw['project_type'] ?? [])));
-        if (!empty($project_type)) {
-            $message[] = 'Project Type: ' . implode(', ', $project_type);
-        }
-        if (($raw['project_size_m2'] ?? '') !== '') {
-            $message[] = 'Project Size (m2): ' . $raw['project_size_m2'];
-        }
-        $message[] = 'Lead channel: ' . ($attribution['channel'] ?? 'Direct');
-        $message[] = 'Lead detail: ' . ($attribution['source_detail'] ?? 'Direct');
-        $message[] = 'Landing page: ' . ($attribution['landing_page'] ?? '');
-        $message[] = 'Submit page: ' . ($attribution['submit_page'] ?? ($raw['context']['page_url'] ?? ''));
-        $message[] = 'Referrer: ' . ($attribution['referrer'] ?? ($raw['context']['referrer'] ?? ''));
-        $message[] = 'UTM source: ' . ($attribution['utm_source'] ?? '');
-        $message[] = 'UTM medium: ' . ($attribution['utm_medium'] ?? '');
-        $message[] = 'UTM campaign: ' . ($attribution['utm_campaign'] ?? '');
-        $message[] = 'UTM term: ' . ($attribution['utm_term'] ?? '');
-        $message[] = 'UTM content: ' . ($attribution['utm_content'] ?? '');
-        $message[] = 'gclid: ' . ($attribution['gclid'] ?? '');
-        $message[] = 'msclkid: ' . ($attribution['msclkid'] ?? '');
-        $message[] = 'CRM Status: ' . ($result['crm_status'] ?? 'skipped');
-        $message[] = 'Books Status: ' . ($result['books_status'] ?? 'skipped');
+        $blends = array_values(array_filter((array) ($data['blends'] ?? [])));
+        $company = $data['company'] ?? $raw['organisation_name'] ?? '';
+        $primary_rows = [
+            'Name:' => $name,
+            'Company:' => $company,
+            'Email:' => $data['email'] ?? '',
+            'Phone:' => $data['phone'] ?? '',
+            'Address:' => $address,
+            'Blends:' => !empty($blends) ? implode(', ', $blends) : '',
+            'Project Type:' => !empty($project_type) ? implode(', ', $project_type) : '',
+            'Project Size (m2):' => ($raw['project_size_m2'] ?? '') !== '' ? $raw['project_size_m2'] : '',
+        ];
+        $secondary_rows = [
+            'Lead channel:' => $attribution['channel'] ?? 'Direct',
+            'Lead detail:' => $attribution['source_detail'] ?? 'Direct',
+            'Landing page:' => $attribution['landing_page'] ?? '',
+            'Submit page:' => $attribution['submit_page'] ?? ($raw['context']['page_url'] ?? ''),
+            'Referrer:' => $attribution['referrer'] ?? ($raw['context']['referrer'] ?? ''),
+            'UTM source:' => $attribution['utm_source'] ?? '',
+            'UTM medium:' => $attribution['utm_medium'] ?? '',
+            'UTM campaign:' => $attribution['utm_campaign'] ?? '',
+            'UTM term:' => $attribution['utm_term'] ?? '',
+            'UTM content:' => $attribution['utm_content'] ?? '',
+            'gclid:' => $attribution['gclid'] ?? '',
+            'msclkid:' => $attribution['msclkid'] ?? '',
+            'CRM Status:' => $result['crm_status'] ?? 'skipped',
+            'Books Status:' => $result['books_status'] ?? 'skipped',
+        ];
 
-        $headers = ['Content-Type: text/plain; charset=UTF-8'];
+        $body = '<div style="font-family:Arial,sans-serif;color:#1f2937;line-height:1.55;">';
+        $body .= '<p style="margin:0 0 18px;">A new sample request has been received.</p>';
+        foreach ($primary_rows as $label => $value) {
+            $body .= '<p style="margin:0 0 8px;"><strong>' . esc_html($label) . '</strong> ' . self::htmlValue($value) . '</p>';
+        }
+        $body .= '<div style="margin-top:22px;padding-top:14px;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.5;color:#6b7280;">';
+        foreach ($secondary_rows as $label => $value) {
+            $body .= '<p style="margin:0 0 6px;"><strong>' . esc_html($label) . '</strong> ' . self::htmlValue($value) . '</p>';
+        }
+        $body .= '</div></div>';
+
+        $from_email = self::notificationFromEmail();
+        $headers = [
+            'Content-Type: text/html; charset=UTF-8',
+            'From: PERMABOUND - Sample Form <' . $from_email . '>',
+        ];
         foreach ($recipients as $recipient) {
             if (is_email($recipient)) {
-                wp_mail($recipient, $subject, implode("\n", $message), $headers);
+                wp_mail($recipient, $subject, $body, $headers);
             }
         }
     }
@@ -158,5 +162,27 @@ class PBSR_Emailer {
         ]);
 
         return implode(', ', array_map('trim', $parts));
+    }
+
+    private static function htmlValue($value) {
+        $value = is_scalar($value) ? trim((string) $value) : '';
+
+        if ($value === '') {
+            return '&nbsp;';
+        }
+
+        return nl2br(esc_html($value));
+    }
+
+    private static function notificationFromEmail() {
+        $admin_email = get_option('admin_email');
+        if (is_email($admin_email)) {
+            return $admin_email;
+        }
+
+        $host = wp_parse_url(home_url('/'), PHP_URL_HOST);
+        $host = $host ? preg_replace('/^www\./i', '', (string) $host) : 'localhost';
+
+        return 'wordpress@' . $host;
     }
 }
