@@ -22,6 +22,86 @@ class PBSR_Product_Selection_Form {
         add_action('wp_ajax_nopriv_' . self::AJAX_ACTION, [__CLASS__, 'handle_submission']);
     }
 
+    private static function get_product_thumbnail_url($product_id) {
+        $thumbnail_id = get_post_thumbnail_id($product_id);
+        if (!$thumbnail_id) {
+            return '';
+        }
+
+        $url = self::get_attachment_image_url_from_metadata($thumbnail_id, [
+            'medium',
+            'woocommerce_thumbnail',
+            'medium_large',
+            'thumbnail',
+        ]);
+
+        if ($url) {
+            return $url;
+        }
+
+        foreach (['medium', 'woocommerce_thumbnail', 'medium_large', 'thumbnail', 'full'] as $size) {
+            $candidate = (string) wp_get_attachment_image_url($thumbnail_id, $size);
+            if ($candidate && !self::is_elementor_thumb_url($candidate)) {
+                return $candidate;
+            }
+        }
+
+        return (string) wp_get_attachment_url($thumbnail_id);
+    }
+
+    private static function get_attachment_image_url_from_metadata($attachment_id, array $preferred_sizes) {
+        $meta = wp_get_attachment_metadata($attachment_id);
+        if (!is_array($meta) || empty($meta['file'])) {
+            return '';
+        }
+
+        $base_dir = wp_normalize_path((string) dirname($meta['file']));
+        if ('.' === $base_dir) {
+            $base_dir = '';
+        }
+
+        $sizes = !empty($meta['sizes']) && is_array($meta['sizes']) ? $meta['sizes'] : [];
+        foreach ($preferred_sizes as $size) {
+            if (empty($sizes[$size]['file'])) {
+                continue;
+            }
+
+            return self::build_upload_url($base_dir, (string) $sizes[$size]['file']);
+        }
+
+        return self::build_upload_url('', (string) $meta['file']);
+    }
+
+    private static function build_upload_url($dir, $file) {
+        $uploads = wp_get_upload_dir();
+        if (empty($uploads['baseurl'])) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ([$dir, $file] as $segment) {
+            $segment = trim((string) wp_normalize_path($segment), '/');
+            if ('' !== $segment) {
+                $parts[] = $segment;
+            }
+        }
+
+        if (!$parts) {
+            return '';
+        }
+
+        $encoded = [];
+        foreach (explode('/', implode('/', $parts)) as $segment) {
+            $encoded[] = rawurlencode($segment);
+        }
+
+        return trailingslashit((string) $uploads['baseurl']) . implode('/', $encoded);
+    }
+
+    private static function is_elementor_thumb_url($url) {
+        return false !== strpos((string) $url, '/elementor/thumbs/');
+    }
+
     public static function render_shortcode($atts) {
         $atts = shortcode_atts([
             'categories' => 'resin-bound-stone-blends,rubber-mulch,soft-gravel,colourbound',
@@ -116,7 +196,7 @@ class PBSR_Product_Selection_Form {
                         }
 
                         $name = get_the_title($product_id);
-                        $thumb = get_the_post_thumbnail_url($product_id, 'medium_large');
+                        $thumb = self::get_product_thumbnail_url($product_id);
                         $sku = self::get_product_sku($product_id);
 
                         if (PBSR_Mapper::isSampleHidden($name, $sku, $hidden)) {
