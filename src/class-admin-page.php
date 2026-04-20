@@ -40,6 +40,7 @@ class PBSR_Admin_Page {
         }
 
         $s = get_option('pbsr_settings', []);
+        $form_fields = PBSR_Settings::normalize_form_fields($s['form_fields'] ?? []);
         ?>
         <div class="wrap">
             <h1>PERMABOUND Sample Relay</h1>
@@ -109,6 +110,43 @@ class PBSR_Admin_Page {
                     </tr>
                 </table>
 
+                <h3>First Page Form Fields</h3>
+                <p>Control the contact and delivery field layout on the first details page.</p>
+                <style>
+                    .pbsr-field-options { max-width: 760px; }
+                    .pbsr-field-options th,
+                    .pbsr-field-options td { vertical-align: middle; }
+                    .pbsr-field-options select { min-width: 120px; }
+                </style>
+                <table class="widefat striped pbsr-field-options">
+                    <thead>
+                        <tr>
+                            <th>Field</th>
+                            <th>Width</th>
+                            <th>Mandatory</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($form_fields as $key => $field): ?>
+                            <tr>
+                                <td><?php echo esc_html($field['label']); ?></td>
+                                <td>
+                                    <select name="pbsr_settings[form_fields][<?php echo esc_attr($key); ?>][width]">
+                                        <option value="half" <?php selected($field['width'], 'half'); ?>>1/2 width</option>
+                                        <option value="full" <?php selected($field['width'], 'full'); ?>>Full width</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <label>
+                                        <input type="checkbox" name="pbsr_settings[form_fields][<?php echo esc_attr($key); ?>][required]" value="1" <?php checked(!empty($field['required'])); ?> />
+                                        Required
+                                    </label>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+
                 <h3>Email Notifications</h3>
                 <p>
                     <label>
@@ -135,6 +173,14 @@ class PBSR_Admin_Page {
                     <textarea name="pbsr_settings[hidden_samples]" rows="6" style="width:400px;"><?php echo esc_textarea($s['hidden_samples'] ?? ''); ?></textarea>
                     <br><small>Matching is case-insensitive and checks both SKU and sample name.</small>
                     <br><small>You can also mark individual products as unavailable on the product edit screen.</small>
+                </p>
+
+                <h3>Sample Availability</h3>
+                <p>
+                    <label>Hidden / unavailable samples (SKU or name, one per line)</label><br>
+                    <textarea name="pbsr_settings[hidden_samples]" rows="6" style="width: 400px;"><?php echo esc_textarea($s['hidden_samples'] ?? ''); ?></textarea>
+                    <br><small>Use this to temporarily hide samples that are out of stock. Matching is case-insensitive and checks both SKU and sample name.</small>
+                    <br><small>You can also mark individual products as unavailable directly on the product edit screen using the "Sample Availability" checkbox.</small>
                 </p>
 
                 <p class="submit"><button class="button button-primary">Save Settings</button></p>

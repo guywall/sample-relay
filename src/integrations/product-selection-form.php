@@ -102,6 +102,36 @@ class PBSR_Product_Selection_Form {
         return false !== strpos((string) $url, '/elementor/thumbs/');
     }
 
+    private static function form_fields() {
+        $settings = PBSR_Settings::get();
+
+        return PBSR_Settings::normalize_form_fields($settings['form_fields'] ?? []);
+    }
+
+    private static function field_is_required(array $fields, $key) {
+        return !empty($fields[$key]['required']);
+    }
+
+    private static function field_width_class(array $fields, $key) {
+        $width = $fields[$key]['width'] ?? 'half';
+
+        return 'full' === $width ? 'pb-field--full' : 'pb-field--half';
+    }
+
+    private static function field_class(array $fields, $key, $extra = '') {
+        $classes = trim('pb-field ' . self::field_width_class($fields, $key) . ' ' . $extra);
+
+        return esc_attr($classes);
+    }
+
+    private static function field_required_attr(array $fields, $key) {
+        return self::field_is_required($fields, $key) ? ' required data-pb-required="1"' : ' data-pb-required="0"';
+    }
+
+    private static function fieldset_required_attrs(array $fields, $key) {
+        return self::field_is_required($fields, $key) ? ' data-pb-required="1"' : ' data-pb-required="0"';
+    }
+
     public static function render_shortcode($atts) {
         $atts = shortcode_atts([
             'categories' => 'resin-bound-stone-blends,rubber-mulch,soft-gravel,colourbound',
@@ -112,6 +142,8 @@ class PBSR_Product_Selection_Form {
         $cats = array_filter(array_map('trim', explode(',', $atts['categories'])));
         $max = (int) $atts['max'];
         $auto_check = '';
+        $form_fields = self::form_fields();
+        $settings = PBSR_Settings::get();
 
         if (is_singular('product')) {
             $auto_check = get_the_title(get_the_ID());
@@ -159,7 +191,6 @@ class PBSR_Product_Selection_Form {
                 </div>
 
                 <?php
-                $settings = PBSR_Settings::get();
                 $hidden = PBSR_Mapper::parseHiddenSamples($settings['hidden_samples'] ?? '');
 
                 foreach ($cats as $slug) {
@@ -238,30 +269,30 @@ class PBSR_Product_Selection_Form {
                 <div class="pb-error-banner" role="alert" aria-live="polite"></div>
 
                 <div class="pb-grid">
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'first_name'); ?>">
                         <label for="pb-first">First name</label>
-                        <input id="pb-first" name="first_name" type="text" required>
+                        <input id="pb-first" name="first_name" type="text"<?php echo self::field_required_attr($form_fields, 'first_name'); ?>>
                     </div>
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'surname'); ?>">
                         <label for="pb-last">Surname</label>
-                        <input id="pb-last" name="surname" type="text" required>
+                        <input id="pb-last" name="surname" type="text"<?php echo self::field_required_attr($form_fields, 'surname'); ?>>
                     </div>
                 </div>
                 <div class="pb-grid">
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'email'); ?>">
                         <label for="pb-email">Email</label>
-                        <input id="pb-email" name="email" type="email" required>
+                        <input id="pb-email" name="email" type="email"<?php echo self::field_required_attr($form_fields, 'email'); ?>>
                     </div>
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'phone'); ?>">
                         <label for="pb-phone">Phone</label>
-                        <input id="pb-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel" required>
+                        <input id="pb-phone" name="phone" type="tel" inputmode="tel" autocomplete="tel"<?php echo self::field_required_attr($form_fields, 'phone'); ?>>
                     </div>
                 </div>
 
                 <div class="pb-grid pb-project-grid">
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'enquiry_type'); ?>">
                         <label for="pb-enquiry">Enquiry type</label>
-                        <select id="pb-enquiry" name="enquiry_type" required>
+                        <select id="pb-enquiry" name="enquiry_type"<?php echo self::field_required_attr($form_fields, 'enquiry_type'); ?>>
                             <option value="">Please select</option>
                             <option value="homeowner">Homeowner</option>
                             <option value="contractor_installer">Contractor/Installer</option>
@@ -270,14 +301,14 @@ class PBSR_Product_Selection_Form {
                             <option value="other">Other</option>
                         </select>
                     </div>
-                    <div class="pb-field" id="pb-org-wrap" style="display:none;">
+                    <div class="<?php echo self::field_class($form_fields, 'organisation_name'); ?>" id="pb-org-wrap" style="display:none;">
                         <label for="pb-org">Organisation name</label>
-                        <input id="pb-org" name="organisation_name" type="text">
+                        <input id="pb-org" name="organisation_name" type="text"<?php echo self::field_required_attr($form_fields, 'organisation_name'); ?>>
                     </div>
                 </div>
 
                 <div class="pb-grid">
-                    <fieldset class="pb-field pb-project-type">
+                    <fieldset class="<?php echo self::field_class($form_fields, 'project_type', 'pb-project-type'); ?>"<?php echo self::fieldset_required_attrs($form_fields, 'project_type'); ?>>
                         <legend>Project Type</legend>
                         <div class="pb-check-group">
                             <label class="pb-check-option" for="pb-project-type-path-patio">
@@ -295,46 +326,50 @@ class PBSR_Product_Selection_Form {
                         </div>
                         <input type="hidden" name="project_type_serialized" value="">
                     </fieldset>
-                    <div class="pb-field">
+                    <div class="<?php echo self::field_class($form_fields, 'project_size_m2'); ?>">
                         <label for="pb-project-size">Project Size in m&sup2;</label>
-                        <input id="pb-project-size" name="project_size_m2" type="number" inputmode="numeric" min="0" step="1">
+                        <input id="pb-project-size" name="project_size_m2" type="number" inputmode="numeric" min="0" step="1"<?php echo self::field_required_attr($form_fields, 'project_size_m2'); ?>>
                         <input type="hidden" name="project_size_value" value="">
                     </div>
                 </div>
 
                 <fieldset class="pb-address">
                     <legend>Shipping address</legend>
-                    <label for="pb-street">Street</label>
-                    <input id="pb-street" name="street" type="text" required>
-                    <label for="pb-address2">Address 2</label>
-                    <input id="pb-address2" name="address_2" type="text">
-                    <div class="pb-grid">
-                        <div class="pb-field">
+                    <div class="pb-address-fields">
+                        <div class="<?php echo self::field_class($form_fields, 'street'); ?>">
+                            <label for="pb-street">Street</label>
+                            <input id="pb-street" name="street" type="text"<?php echo self::field_required_attr($form_fields, 'street'); ?>>
+                        </div>
+                        <div class="<?php echo self::field_class($form_fields, 'address_2'); ?>">
+                            <label for="pb-address2">Address 2</label>
+                            <input id="pb-address2" name="address_2" type="text"<?php echo self::field_required_attr($form_fields, 'address_2'); ?>>
+                        </div>
+                        <div class="<?php echo self::field_class($form_fields, 'city'); ?>">
                             <label for="pb-city">Town/City</label>
-                            <input id="pb-city" name="city" type="text" required>
+                            <input id="pb-city" name="city" type="text"<?php echo self::field_required_attr($form_fields, 'city'); ?>>
                         </div>
-                        <div class="pb-field">
+                        <div class="<?php echo self::field_class($form_fields, 'county'); ?>">
                             <label for="pb-county">County</label>
-                            <input id="pb-county" name="county" type="text" required>
+                            <input id="pb-county" name="county" type="text"<?php echo self::field_required_attr($form_fields, 'county'); ?>>
                         </div>
-                    </div>
-                    <div class="pb-grid">
-                        <div class="pb-field">
+                        <div class="<?php echo self::field_class($form_fields, 'country'); ?>">
                             <label for="pb-country">Country</label>
-                            <input id="pb-country" name="country" type="text" required value="United Kingdom">
+                            <input id="pb-country" name="country" type="text" value="United Kingdom"<?php echo self::field_required_attr($form_fields, 'country'); ?>>
                         </div>
-                        <div class="pb-field">
+                        <div class="<?php echo self::field_class($form_fields, 'postcode'); ?>">
                             <label for="pb-postcode">Postcode</label>
-                            <input id="pb-postcode" name="postcode" type="text" required>
+                            <input id="pb-postcode" name="postcode" type="text"<?php echo self::field_required_attr($form_fields, 'postcode'); ?>>
                         </div>
                     </div>
                 </fieldset>
 
-                <div class="pb-consent">
-                    <label>
-                        <input type="checkbox" name="gdpr_consent" id="pb-gdpr" required>
-                        I agree to be contacted about my sample request and understand how my data will be used.
-                    </label>
+                <div class="pb-grid">
+                    <div class="<?php echo self::field_class($form_fields, 'gdpr_consent', 'pb-consent'); ?>">
+                        <label>
+                            <input type="checkbox" name="gdpr_consent" id="pb-gdpr"<?php echo self::field_required_attr($form_fields, 'gdpr_consent'); ?>>
+                            I agree to be contacted about my sample request and understand how my data will be used.
+                        </label>
+                    </div>
                 </div>
 
                 <div class="pb-nav">
@@ -388,6 +423,9 @@ class PBSR_Product_Selection_Form {
 .pb-step>h3{font-size:2em;font-weight:700;text-transform:uppercase;letter-spacing:.02em;margin:0 0 .25em 0}
 .pb-intro{margin:-.25em 0 1em 0;color:#4e4e4e}
 .pb-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;row-gap:20px}
+.pb-address-fields{display:grid;grid-template-columns:1fr 1fr;gap:16px;row-gap:20px}
+.pb-field--full{grid-column:1/-1}
+.pb-field--half{grid-column:auto}
 .pb-field{margin-bottom:8px}
 .pb-field label{display:block;margin-bottom:6px;font-weight:700}
 .pb-field input,.pb-field select,fieldset.pb-address input,.pb-filter input,.pb-filter select{
@@ -463,6 +501,7 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 #pb-samples-form .pb-check-group{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 #pb-samples-form .pb-check-option{display:flex!important;align-items:center!important;gap:10px;padding:10px 12px;margin:0;border:1px solid var(--pb-border)!important;border-radius:10px;background:#fff;cursor:pointer;transition:border-color .15s,box-shadow .15s,background .15s}
 #pb-samples-form .pb-check-option.is-selected{border-color:var(--pb-brand)!important;box-shadow:0 0 0 3px var(--pb-ring)!important;background:#fffaf3}
+#pb-samples-form .pb-project-type.is-invalid .pb-check-option{border-color:var(--pb-error)!important;box-shadow:0 0 0 3px var(--pb-error-ring)!important}
 #pb-samples-form .pb-check-option:hover{border-color:var(--pb-brand)!important}
 #pb-samples-form .pb-check-option input[type="checkbox"]{width:auto!important;min-width:16px;max-width:16px;height:16px;margin:0!important;flex:0 0 16px}
 #pb-samples-form .pb-check-option span{display:block;flex:1 1 auto;font-weight:700}
@@ -477,6 +516,8 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 }
 @media (max-width:640px){
     .pb-grid{grid-template-columns:1fr}
+    .pb-address-fields{grid-template-columns:1fr}
+    .pb-field--half,.pb-field--full{grid-column:1/-1}
     .pb-filter{flex-direction:column}
     #pb-samples-form .pb-products{grid-template-columns:1fr}
     #pb-samples-form .pb-review-grid{grid-template-columns:1fr}
@@ -767,41 +808,56 @@ CSS;
         }
 
         function validateStep1(form){ // used for details step (index 1)
-    clearErrors(form);
-    var ids = ["pb-first","pb-last","pb-email","pb-phone","pb-enquiry","pb-street","pb-city","pb-county","pb-country","pb-postcode"];
-    var invalid = [];
+            clearErrors(form);
+            var invalid = [];
+            var noPostcodeCheck = form.querySelector("#pb-no-postcode-check");
+            var skipPostcode = noPostcodeCheck && noPostcodeCheck.checked;
 
-    // Skip postcode if "No postcode" is checked or field disabled
-    var noPostcodeCheck = form.querySelector("#pb-no-postcode-check");
-    var skipPostcode = noPostcodeCheck && noPostcodeCheck.checked;
-    if (skipPostcode) {
-        ids = ids.filter(function(id){ return id !== "pb-postcode"; });
-    }
-
-    for (var i=0;i<ids.length;i++){
-        var el = form.querySelector("#"+ids[i]);
-        if (!el || el.disabled || !el.value || !el.value.trim()){ invalid.push(el); }
-    }
-
-    var emailEl = form.querySelector("#pb-email");
-    if (emailEl && emailEl.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailEl.value)){ invalid.push(emailEl); }
-    var phoneEl = form.querySelector("#pb-phone");
-    if (phoneEl && phoneEl.value && !/^([0-9()\+\- ]*)$/.test(phoneEl.value)){ invalid.push(phoneEl); }
-    var gdpr = form.querySelector("#pb-gdpr");
-    if (!gdpr || !gdpr.checked){ invalid.push(gdpr); }
-
-    if (invalid.length){
-        for (var j=0;j<invalid.length;j++){
-            if (invalid[j]){
-                invalid[j].classList.add("is-invalid");
-                invalid[j].setAttribute("aria-invalid","true");
+            function isHidden(el){
+                for (var node = el; node && node !== form; node = node.parentElement){
+                    if (node.hidden || node.style.display === "none"){ return true; }
+                }
+                return false;
             }
+
+            function addInvalid(el){
+                if (el && invalid.indexOf(el) === -1){ invalid.push(el); }
+            }
+
+            Array.prototype.forEach.call(form.querySelectorAll(\'[data-pb-required="1"]\'), function(el){
+                if (!el || el.disabled || isHidden(el)){ return; }
+                if (skipPostcode && el.id === "pb-postcode"){ return; }
+
+                if (el.matches && el.matches("fieldset.pb-project-type")){
+                    if (!form.querySelector(\'input[name="project_type[]"]:checked\')){ addInvalid(el); }
+                    return;
+                }
+
+                if (el.matches && el.matches(\'input[type="checkbox"]\')){
+                    if (!el.checked){ addInvalid(el); }
+                    return;
+                }
+
+                if (!el.value || !el.value.trim()){ addInvalid(el); }
+            });
+
+            var emailEl = form.querySelector("#pb-email");
+            if (emailEl && emailEl.value && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(emailEl.value)){ addInvalid(emailEl); }
+            var phoneEl = form.querySelector("#pb-phone");
+            if (phoneEl && phoneEl.value && !/^([0-9()\+\- ]*)$/.test(phoneEl.value)){ addInvalid(phoneEl); }
+
+            if (invalid.length){
+                for (var j=0;j<invalid.length;j++){
+                    if (invalid[j]){
+                        invalid[j].classList.add("is-invalid");
+                        invalid[j].setAttribute("aria-invalid","true");
+                    }
+                }
+                showError(form, invalid);
+                return false;
+            }
+            return true;
         }
-        showError(form, invalid);
-        return false;
-    }
-    return true;
-}
 
 
         // Clear invalid highlight as user types
@@ -1094,13 +1150,14 @@ autocomplete.addListener("place_changed", function () {
     if (postcodeField) {
         var wrapper = postcodeField.parentElement;
         var existingBox = wrapper.querySelector(".pb-no-postcode");
+        var postcodeRequiredBySettings = postcodeField.getAttribute("data-pb-required") === "1";
 
         if (!existingBox) {
             var div = document.createElement("div");
             div.className = "pb-no-postcode";
             div.innerHTML = `
                 <label style="display:flex;align-items:center;gap:6px;margin-top:4px;font-size:0.9em;cursor:pointer;">
-                    <input type="checkbox" id="pb-no-postcode-check" style="width:auto;vertical-align:middle;" />
+                    <input type="checkbox" id="pb-no-postcode-check" name="no_postcode" value="1" style="width:auto;vertical-align:middle;" />
                     <span>No postcode</span>
                 </label>
             `;
@@ -1115,7 +1172,11 @@ autocomplete.addListener("place_changed", function () {
                 checkbox.checked = false;
                 checkbox.closest(".pb-no-postcode").style.display = "none";
             }
-            postcodeField.setAttribute("required", "required");
+            if (postcodeRequiredBySettings) {
+                postcodeField.setAttribute("required", "required");
+            } else {
+                postcodeField.removeAttribute("required");
+            }
         } else {
             if (checkbox) checkbox.closest(".pb-no-postcode").style.display = "block";
 
@@ -1129,7 +1190,11 @@ autocomplete.addListener("place_changed", function () {
                 } else {
                     postcodeField.disabled = false;
                     postcodeField.placeholder = "Postcode";
-                    postcodeField.setAttribute("required", "required");
+                    if (postcodeRequiredBySettings) {
+                        postcodeField.setAttribute("required", "required");
+                    } else {
+                        postcodeField.removeAttribute("required");
+                    }
                 }
             });
         }
@@ -1217,6 +1282,7 @@ autocomplete.addListener("place_changed", function () {
         $project_type = self::sanitize_project_types(wp_unslash($_POST['project_type'] ?? ($_POST['project_type_serialized'] ?? [])));
         $project_size_raw = sanitize_text_field(wp_unslash($_POST['project_size_m2'] ?? ($_POST['project_size_value'] ?? '')));
         $project_size = ($project_size_raw !== '' && preg_match('/^\d+$/', $project_size_raw)) ? (int) $project_size_raw : '';
+        $no_postcode = !empty($_POST['no_postcode']);
 
         $product_names = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_names'] ?? ($_POST['product_selection'] ?? [])));
         $product_skus = array_map('sanitize_text_field', (array) wp_unslash($_POST['product_skus'] ?? []));
@@ -1232,7 +1298,52 @@ autocomplete.addListener("place_changed", function () {
             $aligned_skus[$i] = $product_skus[$i] ?? '';
         }
 
-        if (!$first || !$last || !$email || !$phone || !$street || !$city || !$county || !$country || !$postcode || !$enquiry || $gdpr !== 'yes' || empty($product_names)) {
+        $field_settings = self::form_fields();
+        $required_values = [
+            'first_name' => $first,
+            'surname' => $last,
+            'email' => $email,
+            'phone' => $phone,
+            'enquiry_type' => $enquiry,
+            'organisation_name' => $org,
+            'project_type' => $project_type,
+            'project_size_m2' => $project_size_raw,
+            'street' => $street,
+            'address_2' => $addr2,
+            'city' => $city,
+            'county' => $county,
+            'country' => $country,
+            'postcode' => $postcode,
+            'gdpr_consent' => $gdpr,
+        ];
+
+        foreach ($required_values as $key => $value) {
+            if (!self::field_is_required($field_settings, $key)) {
+                continue;
+            }
+
+            if ('organisation_name' === $key && ('' === $enquiry || 'homeowner' === $enquiry)) {
+                continue;
+            }
+
+            if ('postcode' === $key && $no_postcode) {
+                continue;
+            }
+
+            if ('gdpr_consent' === $key && 'yes' !== $value) {
+                wp_send_json_error(['message' => 'Missing required fields.']);
+            }
+
+            if (is_array($value) && empty($value)) {
+                wp_send_json_error(['message' => 'Missing required fields.']);
+            }
+
+            if (!is_array($value) && '' === trim((string) $value)) {
+                wp_send_json_error(['message' => 'Missing required fields.']);
+            }
+        }
+
+        if (($email !== '' && !is_email($email)) || empty($product_names)) {
             wp_send_json_error(['message' => 'Missing required fields.']);
         }
 
@@ -1253,7 +1364,7 @@ autocomplete.addListener("place_changed", function () {
                 'phone' => $phone,
                 'enquiry_type' => $enquiry,
                 'organisation_name' => $org,
-                'gdpr_consent' => true,
+                'gdpr_consent' => $gdpr === 'yes',
             ],
             'shipping' => [
                 'street' => $street,

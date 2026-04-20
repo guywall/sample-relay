@@ -40,12 +40,118 @@ class PBSR_Settings {
             'hidden_samples'  => '',
             'repeat_limit_days' => 30,
             'google_places_api_key' => '',
+            'form_fields' => self::form_field_defaults(),
         ];
 
-        return wp_parse_args(get_option(self::OPT_KEY, []), $defaults);
+        $settings = wp_parse_args(get_option(self::OPT_KEY, []), $defaults);
+        $settings['form_fields'] = self::normalize_form_fields($settings['form_fields'] ?? []);
+
+        return $settings;
     }
 
     public static function update($data) {
         update_option(self::OPT_KEY, $data);
+    }
+
+    public static function form_field_defaults() {
+        return [
+            'first_name' => [
+                'label' => 'First name',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'surname' => [
+                'label' => 'Surname',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'email' => [
+                'label' => 'Email',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'phone' => [
+                'label' => 'Phone',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'enquiry_type' => [
+                'label' => 'Enquiry type',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'organisation_name' => [
+                'label' => 'Organisation name',
+                'width' => 'half',
+                'required' => 0,
+            ],
+            'project_type' => [
+                'label' => 'Project type',
+                'width' => 'half',
+                'required' => 0,
+            ],
+            'project_size_m2' => [
+                'label' => 'Project size',
+                'width' => 'half',
+                'required' => 0,
+            ],
+            'street' => [
+                'label' => 'Street',
+                'width' => 'full',
+                'required' => 1,
+            ],
+            'address_2' => [
+                'label' => 'Address 2',
+                'width' => 'full',
+                'required' => 0,
+            ],
+            'city' => [
+                'label' => 'Town/City',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'county' => [
+                'label' => 'County',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'country' => [
+                'label' => 'Country',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'postcode' => [
+                'label' => 'Postcode',
+                'width' => 'half',
+                'required' => 1,
+            ],
+            'gdpr_consent' => [
+                'label' => 'Consent checkbox',
+                'width' => 'full',
+                'required' => 1,
+            ],
+        ];
+    }
+
+    public static function normalize_form_fields($fields) {
+        $fields = is_array($fields) ? $fields : [];
+        $defaults = self::form_field_defaults();
+        $normalized = [];
+
+        foreach ($defaults as $key => $default) {
+            $incoming = isset($fields[$key]) && is_array($fields[$key]) ? $fields[$key] : [];
+            $has_incoming = array_key_exists($key, $fields);
+            $width = isset($incoming['width']) && in_array($incoming['width'], ['half', 'full'], true)
+                ? $incoming['width']
+                : $default['width'];
+
+            $normalized[$key] = [
+                'label' => $default['label'],
+                'width' => $width,
+                'required' => $has_incoming ? (!empty($incoming['required']) ? 1 : 0) : (int) $default['required'],
+            ];
+        }
+
+        return $normalized;
     }
 }
