@@ -222,7 +222,15 @@ class PBSR_Product_Selection_Form {
                     echo '<div class="pb-products" data-cat="' . esc_attr($slug) . '">';
 
                     foreach ($query->posts as $product_id) {
-                        if (class_exists('PBSR_Product_Availability') && PBSR_Product_Availability::is_unavailable($product_id)) {
+                        $availability = class_exists('PBSR_Product_Availability')
+                            ? PBSR_Product_Availability::get_status($product_id)
+                            : 'available';
+                        $is_visible = !class_exists('PBSR_Product_Availability')
+                            || PBSR_Product_Availability::is_visible_in_grid($product_id);
+                        $is_selectable = !class_exists('PBSR_Product_Availability')
+                            || PBSR_Product_Availability::is_selectable_in_grid($product_id);
+
+                        if (!$is_visible) {
                             continue;
                         }
 
@@ -236,9 +244,11 @@ class PBSR_Product_Selection_Form {
 
                         $ptype = wp_get_post_terms($product_id, 'product_type', ['fields' => 'slugs']);
                         $ptype_class = (!is_wp_error($ptype) && $ptype) ? implode(' ', $ptype) : '';
-                        $checked = ($auto_check && $auto_check === $name) ? 'checked' : '';
+                        $availability_class = !$is_selectable ? ' pb-card--unavailable' : '';
+                        $checked = ($is_selectable && $auto_check && $auto_check === $name) ? 'checked' : '';
+                        $disabled = $is_selectable ? '' : 'disabled aria-disabled="true"';
                         ?>
-                        <label class="pb-card <?php echo esc_attr($ptype_class); ?>">
+                        <label class="pb-card <?php echo esc_attr($ptype_class . $availability_class); ?>" data-availability="<?php echo esc_attr($availability); ?>"<?php echo $is_selectable ? '' : ' aria-disabled="true"'; ?>>
                             <input
                                 type="checkbox"
                                 class="pb-choice"
@@ -248,11 +258,15 @@ class PBSR_Product_Selection_Form {
                                 data-sku="<?php echo esc_attr($sku); ?>"
                                 data-thumb="<?php echo esc_url($thumb ?: ''); ?>"
                                 <?php echo $checked; ?>
+                                <?php echo $disabled; ?>
                             >
                             <?php if ($thumb): ?>
                                 <img src="<?php echo esc_url($thumb); ?>" alt="<?php echo esc_attr($name); ?>">
                             <?php endif; ?>
                             <span class="pb-name"><?php echo esc_html($name); ?></span>
+                            <?php if (!$is_selectable): ?>
+                                <span class="pb-availability-note">Currently unavailable</span>
+                            <?php endif; ?>
                         </label>
                         <?php
                     }
@@ -464,6 +478,13 @@ input[type="checkbox"].is-invalid{outline:2px solid var(--pb-error);outline-offs
 .pb-card.is-selected{border-color:var(--pb-brand);box-shadow:0 0 0 2px var(--pb-ring)}
 .pb-card.is-selected .pb-name{font-weight:700}
 .pb-card.is-selected::after{content:"\2713";position:absolute;top:8px;right:8px;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--pb-brand);color:#4e4e4e;font-weight:800;font-size:14px;line-height:1}
+.pb-card--unavailable{cursor:not-allowed;background:#f3f4f6;color:#767676;filter:grayscale(1);opacity:.76}
+.pb-card--unavailable:hover{box-shadow:none}
+.pb-card--unavailable:active{transform:none}
+.pb-card--unavailable img{opacity:.55}
+.pb-card--unavailable .pb-name{text-decoration:line-through;text-decoration-thickness:2px}
+.pb-card--unavailable::before{content:"";position:absolute;left:10px;right:10px;top:50%;height:2px;background:#8d939c;transform:rotate(-12deg);z-index:1}
+.pb-availability-note{position:relative;z-index:2;font-size:.78rem;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:#5f6368}
 .pb-cat-title{margin:8px 0;font-size:1.1rem;list-style:none}
 .pb-accordion{border-top:1px solid var(--pb-border-soft);padding:8px 0}
 .pb-accordion summary{cursor:pointer;padding:8px 0;font-weight:800;display:flex;align-items:center;gap:8px;transition:color .15s}
@@ -1298,6 +1319,10 @@ autocomplete.addListener("place_changed", function () {
             $aligned_skus[$i] = $product_skus[$i] ?? '';
         }
 
+        if (class_exists('PBSR_Product_Availability') && !self::submitted_products_are_selectable($product_names, $aligned_skus)) {
+            wp_send_json_error(['message' => 'One or more selected products are not currently available.']);
+        }
+
         $field_settings = self::form_fields();
         $required_values = [
             'first_name' => $first,
@@ -1434,6 +1459,63 @@ autocomplete.addListener("place_changed", function () {
         $sanitized = array_map('sanitize_text_field', (array) $values);
 
         return array_values(array_intersect($allowed, $sanitized));
+    }
+
+    private static function submitted_products_are_selectable(array $product_names, array $product_skus) {
+        foreach ($product_names as $i => $name) {
+            $product_id = self::find_product_id_for_sample($name, $product_skus[$i] ?? '');
+
+            if (!$product_id || !PBSR_Product_Availability::is_selectable_in_grid($product_id)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private static function find_product_id_for_sample($name, $sku = '') {
+        $name = trim((string) $name);
+        $sku = trim((string) $sku);
+        $post_types = ['product', 'products'];
+
+        if ('' !== $sku) {
+            foreach (['sample_sku', 'sku', '_sku', 'product_sku'] as $meta_key) {
+                $matches = get_posts([
+                    'post_type' => $post_types,
+                    'post_status' => 'publish',
+                    'posts_per_page' => 5,
+                    'fields' => 'ids',
+                    'meta_key' => $meta_key,
+                    'meta_value' => $sku,
+                ]);
+
+                foreach ($matches as $product_id) {
+                    if ('' === $name || get_the_title($product_id) === $name) {
+                        return (int) $product_id;
+                    }
+                }
+            }
+        }
+
+        if ('' === $name) {
+            return 0;
+        }
+
+        $matches = get_posts([
+            'post_type' => $post_types,
+            'post_status' => 'publish',
+            'posts_per_page' => 5,
+            'fields' => 'ids',
+            'title' => $name,
+        ]);
+
+        foreach ($matches as $product_id) {
+            if (get_the_title($product_id) === $name) {
+                return (int) $product_id;
+            }
+        }
+
+        return 0;
     }
 }
 
